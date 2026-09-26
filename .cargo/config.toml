@@ -1,0 +1,3 @@
+[build]
+# Keep compilation responsive on the 16 GB development machine.
+jobs = 2
