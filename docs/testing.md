@@ -3,10 +3,12 @@
 ## Credential checks and country selection — 27 September 2026
 
 - Passed: the saved service credentials established a real US VPN connection, including through the app's new temporary connection check.
+- Passed: live browser IP checks for India, US, UK, Australia, Canada, UAE, France, Singapore, Germany, and Netherlands. US, Germany, and UK were also verified while running together; the other countries were tested sequentially.
 - Passed: 12 Rust checks, including current NordVPN recommendations and valid connection files for all ten countries, and Compose validation for each country.
 - Passed: onboarding fixtures keep failed credential checks on the entry step, allow retry and checking saved values, and create an Indian workspace from the first-browser country picker.
 - Passed: native desktop checks for credential input validation, saved-but-unverified credentials, setup persistence, and workspace creation.
 - Startup now waits for a healthy VPN before creating Chromium. Each start downloads current configurations for NordVPN's recommended servers; the previous bundled server data included outdated addresses and ports.
+- Canada initially failed the website IP check; the resolver trace plus website fallback passed on retest. A French server rejected a login that worked elsewhere; startup now tries the remaining recommended servers before reporting failure, and France passed on retest.
 
 Run the optional live connection check with `REGIONBOX_ENV_FILE` set to the existing credentials file:
 
@@ -15,6 +17,10 @@ cargo run --manifest-path src-tauri/Cargo.toml --example check_connection --feat
 ```
 
 It checks the saved login, starts separate US/DE/GB browsers, checks their exit countries, and stops its own workspaces afterward. Credentials are not printed or overwritten.
+
+Use `--countries IN,AU,CA,AE,FR,SG,NL` instead of `--workspaces` to test additional countries sequentially. With the same credentials path set, `node scripts/test-credentials.mjs` checks the real credentials step in the release app, using separate test settings. Set `REGIONBOX_TEST_EXE` to test an installed executable.
+
+Still pending: a fresh Windows machine installation, browser cookie persistence across container recreation, and dedicated DNS/IPv6/WebRTC and VPN-loss checks. Live country routing does not establish those checks passed.
 
 ## Onboarding and installer results — 27 September 2026
 

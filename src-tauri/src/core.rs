@@ -258,7 +258,6 @@ async fn connect_recommended(path: &Path, container: &str, configs: &[String]) -
         execute(command, 40).await?;
         match wait_for_vpn(container).await {
             Ok(()) => return Ok(()),
-            Err(error) if error.starts_with("NordVPN rejected") => return Err(error),
             Err(error) => failure = error,
         }
     }

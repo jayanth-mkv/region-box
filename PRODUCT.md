@@ -28,7 +28,7 @@ Name: RegionBox. The user repeatedly requested the simplest working version and 
 
 ## Evidence on Hand
 
-docs/rough_idea_what_i_want_to_build.md and the user's confirmed choices. Network behavior remains unverified until tested with working VPN credentials.
+docs/rough_idea_what_i_want_to_build.md and the user's confirmed choices. Live browser IP country checks have passed for all ten countries, including simultaneous US/Germany/UK workspaces. Dedicated leak and VPN-loss checks remain pending in docs/testing.md.
 
 ## Product Principles
 
