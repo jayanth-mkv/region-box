@@ -132,6 +132,22 @@ try {
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   await page.getByRole('button', { name: 'Open browser', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'India', exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    window.__setupFixture.data.workspaces.find(w => w.id === 'new-country').browserUrl = 'about:blank';
+  });
+  await page.getByRole('button', { name: 'Refresh status' }).click();
+  await expect(page.getByTitle('India browser')).toBeVisible();
+  for (const size of [{ width: 760, height: 560 }, { width: 1280, height: 820 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(size);
+    const layout = await page.evaluate(() => {
+      const frame = document.querySelector('iframe').getBoundingClientRect();
+      const footer = document.querySelector('footer').getBoundingClientRect();
+      return { overflow: document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight,
+        frameFits: frame.bottom <= footer.top + 1 && frame.right <= innerWidth && frame.height > 100 };
+    });
+    expect(layout).toEqual({ overflow: false, frameFits: true });
+  }
+  await page.screenshot({ path: 'test-results/browser-layout.png' });
   expect(errors).toEqual([]);
   console.log('PASS: onboarding UI fixtures cover installation progress, restart pause, automatic next step, download retry, credentials, country selection, completion, and narrow layout.');
   console.log('These fixtures do not execute Windows/Docker installers or establish a VPN connection.');

@@ -90,6 +90,15 @@ try {
   await expect(page.getByRole('heading', { name: 'Connect NordVPN to get started' })).toBeVisible();
   await page.screenshot({ path: 'test-results/desktop-setup.png' });
 
+  await page.getByRole('button', { name: 'Full screen', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Exit full screen', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__TAURI_INTERNALS__.invoke('plugin:window|is_fullscreen', { label: 'main' }))).toBe(true);
+  await expect(page.getByRole('navigation', { name: 'Workspaces' })).toBeHidden();
+  await page.screenshot({ path: 'test-results/fullscreen-native.png' });
+  await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
+  await expect(navigation).toBeVisible();
+  expect(await page.evaluate(() => window.__TAURI_INTERNALS__.invoke('plugin:window|is_fullscreen', { label: 'main' }))).toBe(false);
+
   await page.getByRole('button', { name: 'Set up NordVPN' }).click();
   await expect(page.getByLabel('Service password')).toHaveAttribute('type', 'password');
   await page.getByLabel('Service username').fill('account@example.com');

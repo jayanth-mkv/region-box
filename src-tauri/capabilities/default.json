@@ -3,5 +3,5 @@
   "identifier": "main-window",
   "description": "Only the local RegionBox window can invoke app commands.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-is-fullscreen", "core:window:allow-set-fullscreen"]
 }

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Boxes, Globe, Play, Square, Plus, RefreshCw, Settings, LoaderCircle, ShieldCheck, CircleAlert, ChevronLeft } from 'lucide-react';
+import { Boxes, Globe, Play, Square, Plus, RefreshCw, Settings, LoaderCircle, ShieldCheck, CircleAlert, ChevronLeft, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +43,8 @@ export default function App() {
   const [setup, setSetup] = useState<SetupStatus | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [setupWorking, setSetupWorking] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [resizing, setResizing] = useState(false);
   const refreshing = useRef(false);
   const current = data?.workspaces.find(w => w.id === selected) ?? data?.workspaces[0];
   const running = data?.workspaces.filter(w => w.state === 'running').length ?? 0;
@@ -74,6 +76,17 @@ export default function App() {
     try { await fn(); }
     catch (e) { setError(String(e)); }
     finally { setBusy(''); await refresh(); }
+  };
+
+  const toggleFullscreen = async () => {
+    setResizing(true);
+    try {
+      const window = getCurrentWindow();
+      const next = !(await window.isFullscreen());
+      await window.setFullscreen(next);
+      setFullscreen(next);
+    } catch (e) { setError(String(e)); }
+    finally { setResizing(false); }
   };
 
   const create = (event: FormEvent) => {
@@ -118,8 +131,8 @@ export default function App() {
   if (showSetup) return <><Onboarding initial={setup} data={data} refresh={refresh} onBusy={setSetupWorking} onLeave={id => { setShowSetup(false); if (id) { setSelected(id); setTab('workspace'); } }} />{closeDialog}</>;
 
   return (
-    <div className="flex h-svh flex-col overflow-hidden bg-background text-foreground">
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3">
+    <div data-fullscreen={fullscreen} className="flex h-svh min-w-0 flex-col overflow-hidden bg-background text-foreground [&[data-fullscreen=true]_.app-chrome]:hidden">
+      <header className="app-chrome flex shrink-0 items-center justify-between gap-4 border-b px-5 py-3">
         <div className="flex items-center gap-2.5"><Boxes className="size-5" /><span className="font-semibold">RegionBox</span><Badge variant="secondary">Local</Badge></div>
         <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground sm:inline">{running} running</span>
@@ -129,7 +142,7 @@ export default function App() {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-        <aside className="flex shrink-0 flex-col border-b bg-muted/20 sm:w-60 sm:border-r sm:border-b-0">
+        <aside className="app-chrome flex min-h-0 shrink-0 flex-col border-b bg-muted/20 sm:w-60 sm:border-r sm:border-b-0">
           <div className="flex items-center justify-between px-4 pt-5 pb-3"><h1 className="text-sm font-medium">Workspaces</h1><Button size="icon-sm" variant="ghost" aria-label="Create workspace" disabled={working} onClick={() => { setCreating(true); setTab('workspace'); setLogs(null); }}><Plus /></Button></div>
           <ScrollArea className="max-h-44 sm:max-h-none sm:flex-1">
             <nav aria-label="Workspaces" className="space-y-1 px-2 pb-3">
@@ -154,7 +167,7 @@ export default function App() {
           {data && !data.dockerReady && <div className="shrink-0 px-5 pt-4"><Alert><CircleAlert /><AlertTitle>Set up Docker Desktop</AlertTitle><AlertDescription><p>{data.dockerMessage}</p><Button size="sm" disabled={working} onClick={openSetup}>Open setup</Button></AlertDescription></Alert></div>}
 
           <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
-            <div className="shrink-0 px-5 pt-4"><TabsList><TabsTrigger value="workspace">Browser</TabsTrigger><TabsTrigger value="settings">Settings</TabsTrigger></TabsList></div>
+            <div className="app-chrome shrink-0 px-5 pt-4"><TabsList><TabsTrigger value="workspace">Browser</TabsTrigger><TabsTrigger value="settings">Settings</TabsTrigger></TabsList></div>
 
             <TabsContent value="settings" className="min-h-0 flex-1 overflow-auto p-5">
               <div className="max-w-xl space-y-5">
@@ -179,26 +192,27 @@ export default function App() {
 
             <TabsContent value="workspace" className="flex min-h-0 flex-1 flex-col">
               {creating ? <div className="overflow-auto p-5"><Card className="max-w-lg"><CardHeader><CardTitle>Create workspace</CardTitle><CardDescription>A separate Chromium profile and NordVPN connection.</CardDescription></CardHeader><CardContent><form onSubmit={create} className="space-y-4"><div className="space-y-2"><Label htmlFor="workspace-name">Name</Label><Input id="workspace-name" value={name} onChange={e => setName(e.target.value)} maxLength={48} required autoFocus placeholder="e.g. Germany work" /></div><div className="space-y-2"><Label htmlFor="workspace-country">Country</Label><NativeSelect id="workspace-country" value={country} onChange={e => setCountry(e.target.value)}>{Object.entries(countries).map(([code, label]) => <NativeSelectOption key={code} value={code}>{label}</NativeSelectOption>)}</NativeSelect></div><div className="flex gap-2"><Button type="submit" disabled={working || !name.trim()}>Create workspace</Button><Button variant="outline" type="button" onClick={() => setCreating(false)}>Cancel</Button></div></form></CardContent></Card></div> : current ? <>
-                <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 p-5">
-                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="max-w-96 truncate text-lg font-semibold">{current.name}</h2><Badge variant={current.state === 'running' ? 'default' : 'secondary'}>{stateLabel[current.state]}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{countries[current.country]} · Chromium</p></div>
+                <div className={`flex shrink-0 flex-wrap items-center justify-between gap-3 ${fullscreen ? 'px-4 py-2' : 'p-5'}`}>
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="max-w-96 truncate text-lg font-semibold">{current.name}</h2><Badge variant={current.state === 'running' ? 'default' : 'secondary'}>{stateLabel[current.state]}</Badge></div><p className="app-chrome mt-1 text-sm text-muted-foreground">{countries[current.country]} · Chromium</p></div>
                   <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" disabled={resizing} onClick={() => void toggleFullscreen()}>{fullscreen ? <Minimize /> : <Maximize />}{fullscreen ? 'Exit full screen' : 'Full screen'}</Button>
                     <Button variant="outline" size="sm" disabled={working || current.state !== 'running'} onClick={() => void action('Checking IP', () => invoke('verify_workspace', { id: current.id }))}><ShieldCheck />Check IP</Button>
                     {current.state === 'running' || current.state === 'unhealthy' || current.state === 'error' ? <Button variant="outline" size="sm" disabled={working || !data?.dockerReady} onClick={() => void action('Stopping workspace', () => invoke('stop_workspace', { id: current.id }))}><Square />Stop</Button> : null}
                     {current.state !== 'running' && <Button size="sm" disabled={working || !data?.dockerReady || !data.credentialsReady} onClick={start}>{working ? <LoaderCircle className="animate-spin motion-reduce:animate-none" /> : <Play />}{current.state === 'unhealthy' || current.state === 'error' ? 'Retry start' : 'Start workspace'}</Button>}
                   </div>
                 </div>
 
-                {current.network && <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-y bg-muted/30 px-5 py-2 text-xs"><span>Public IP <span className="ml-1 font-mono font-medium">{current.network.ip}</span></span><span>Detected country <strong>{countries[current.network.country] ?? current.network.country}</strong></span><span className="text-muted-foreground">Checked {new Date(current.network.checkedAt * 1000).toLocaleTimeString()}</span>{current.network.country !== current.country && <span className="font-medium text-destructive">Country differs from your selection. Restart to try another server.</span>}</div>}
+                {current.network && <div className="app-chrome flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-y bg-muted/30 px-5 py-2 text-xs"><span>Public IP <span className="ml-1 font-mono font-medium">{current.network.ip}</span></span><span>Detected country <strong>{countries[current.network.country] ?? current.network.country}</strong></span><span className="text-muted-foreground">Checked {new Date(current.network.checkedAt * 1000).toLocaleTimeString()}</span>{current.network.country !== current.country && <span className="font-medium text-destructive">Country differs from your selection. Restart to try another server.</span>}</div>}
 
-                <div className="relative min-h-0 flex-1 overflow-auto border-t bg-muted/20">
-                  {current.browserUrl ? logs !== null ? <div className="p-5"><Button size="sm" variant="outline" className="mb-4" onClick={() => setLogs(null)}><ChevronLeft />Back to browser</Button><pre className="whitespace-pre-wrap break-all rounded-md border bg-background p-4 text-xs">{logs}</pre></div> : <iframe key={`${current.id}-${frameVersion}`} title={`${current.name} browser`} src={current.browserUrl} className="h-full min-h-96 w-full border-0 bg-background" allow="clipboard-read; clipboard-write; fullscreen" /> : <div className="grid min-h-full place-items-center p-6">
+                <div className={`relative min-h-0 min-w-0 flex-1 border-t bg-muted/20 ${current.browserUrl && logs === null ? 'overflow-hidden' : 'overflow-auto'}`}>
+                  {current.browserUrl ? logs !== null ? <div className="p-5"><Button size="sm" variant="outline" className="mb-4" onClick={() => setLogs(null)}><ChevronLeft />Back to browser</Button><pre className="whitespace-pre-wrap break-all rounded-md border bg-background p-4 text-xs">{logs}</pre></div> : <iframe key={`${current.id}-${frameVersion}`} title={`${current.name} browser`} src={current.browserUrl} className="absolute inset-0 block h-full min-h-0 w-full border-0 bg-background" allow="clipboard-read; clipboard-write; fullscreen" referrerPolicy="no-referrer" /> : <div className="grid min-h-full place-items-center p-6">
                     <div className="w-full max-w-md space-y-5">
                       {isBusyState(current) ? <><LoaderCircle className="size-8 animate-spin text-muted-foreground motion-reduce:animate-none" /><h3 className="text-lg font-medium">{stateLabel[current.state]}</h3><p role="status" className="text-sm text-muted-foreground">{current.detail}</p></> : !data?.credentialsReady ? <><Globe className="size-8 text-muted-foreground" /><h3 className="text-lg font-medium">Connect NordVPN to get started</h3><p className="text-sm leading-6 text-muted-foreground">Your US, Germany, and UK workspaces are ready to set up. Add your service credentials, then start the browsers you need.</p><Button onClick={() => setTab('settings')}><Settings />Set up NordVPN</Button></> : <><Globe className="size-8 text-muted-foreground" /><h3 className="text-lg font-medium">{current.state === 'error' || current.state === 'unhealthy' ? 'This workspace needs attention' : 'Your browser is stopped'}</h3><p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{current.detail}</p><p className="text-sm text-muted-foreground">Start this workspace to browse through {countries[current.country]}. Your other workspaces stay independent.</p><Button disabled={working || !data.dockerReady} onClick={start}><Play />Start workspace</Button></>}
                       {logs !== null && <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-background p-3 text-xs">{logs}</pre>}
                     </div>
                   </div>}
                 </div>
-                <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-5 py-2">
+                <footer className="app-chrome flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-5 py-2">
                   <p className="text-xs text-muted-foreground">{current.state === 'running' && !current.network ? 'Country and public IP have not been verified yet.' : 'Stopping a workspace keeps its browser data.'}</p>
                   <div className="flex gap-1">{current.browserUrl && <Button variant="ghost" size="sm" onClick={() => { setLogs(null); setFrameVersion(v => v + 1); }}><RefreshCw />Reload view</Button>}<Button variant="ghost" size="sm" disabled={working} onClick={() => void action('Loading logs', async () => setLogs(await invoke<string>('workspace_logs', { id: current.id })))}>View logs</Button></div>
                 </footer>
