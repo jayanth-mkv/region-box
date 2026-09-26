@@ -11,11 +11,13 @@ await writeFile(resolve(root, '.env'), 'NORDVPN_SERVICE_USER=\nNORDVPN_SERVICE_P
 await mkdir('test-results', { recursive: true });
 
 async function launch() {
+  const appEnv = { ...process.env, REGIONBOX_DATA_DIR: root, REGIONBOX_ENV_FILE: resolve(root, '.env'),
+    WEBVIEW2_USER_DATA_FOLDER: resolve(root, 'webview'),
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9339' };
+  if (process.env.REGIONBOX_TEST_PORTABLE === '1') delete appEnv.REGIONBOX_ENV_FILE;
   const app = spawn(executable, [], {
     windowsHide: true,
-    env: { ...process.env, REGIONBOX_DATA_DIR: root, REGIONBOX_ENV_FILE: resolve(root, '.env'),
-      WEBVIEW2_USER_DATA_FOLDER: resolve(root, 'webview'),
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9339' },
+    env: appEnv,
     stdio: 'ignore',
   });
   let launchError;
@@ -39,6 +41,8 @@ async function launch() {
   const errors = [];
   page.on('pageerror', error => errors.push(String(error)));
   await expect(page.getByRole('heading', { name: 'Workspaces', exact: true }).or(page.getByRole('heading', { name: 'Set up your regional browsers' }))).toBeVisible({ timeout: 60000 });
+  const credentialsPath = await page.evaluate(async () => (await window.__TAURI_INTERNALS__.invoke('snapshot')).credentialsPath);
+  expect(resolve(credentialsPath).toLowerCase()).toBe(resolve(root, '.env').toLowerCase());
   if (await page.getByRole('heading', { name: 'Set up your regional browsers' }).isVisible()) {
     await expect(page.getByRole('navigation', { name: 'Setup progress' })).toBeVisible();
     await expect(page.getByText('Connect your NordVPN account', { exact: true })).toBeVisible();

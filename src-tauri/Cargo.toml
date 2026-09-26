@@ -28,5 +28,6 @@ incremental = false
 
 [profile.release]
 strip = true
-lto = "thin"
+# Keep release packaging usable alongside Docker on a 16 GB Windows PC.
+lto = false
 codegen-units = 8

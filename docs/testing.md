@@ -1,5 +1,16 @@
 # Verification
 
+## Onboarding and installer results — 27 September 2026
+
+- Passed: TypeScript/Vite build, eight Rust checks, and onboarding UI fixtures.
+- Passed: native desktop onboarding and existing-prerequisite reuse.
+- Passed: the NSIS installer installed RegionBox for the current Windows user and created its Start menu shortcut.
+- Passed: the installed release executable completed the native desktop test with no credentials-path override. It used its own app data directory rather than the development project's `.env`.
+- Built: `src-tauri/target/release/bundle/nsis/RegionBox_0.1.0_x64-setup.exe` (about 3 MB, unsigned).
+- Pending: fresh-PC WSL/Docker installation and the live NordVPN checks below.
+
+The initial build with link-time optimization exhausted available RAM and caused a Docker readiness timeout. The native check passed after the build pressure was removed. Release packaging now disables link-time optimization; the installer was produced from a release executable with that optimization disabled and tested after installation.
+
 ## Initial setup results — 27 September 2026
 
 - Passed: TypeScript/Vite production build and standalone Windows prototype build.
@@ -8,7 +19,22 @@
 - Passed: real Chromium video, mouse/keyboard navigation, access refresh, and refusal of connections without a viewer token.
 - Pending: live NordVPN routing, concurrent US/DE/UK connections, browser profile persistence, DNS/IPv6/WebRTC egress, and VPN-loss behavior. These require the user's service credentials.
 
-The standalone executable is `src-tauri/target/debug/regionbox.exe`. No Windows installer has been built yet.
+The developer prototype is `src-tauri/target/debug/regionbox.exe`. Build the shareable Windows installer with `npm run desktop:build`; its output is under `src-tauri/target/release/bundle/nsis/`.
+
+## Onboarding checks
+
+```powershell
+rtk npm run test:onboarding
+rtk npm run test:desktop
+```
+
+The onboarding UI fixtures cover a missing installation, measured download progress, administrator guidance, a restart pause, automatic continuation from Docker into image downloads, an interrupted download and retry, credential entry, country selection, successful completion, and a narrow window. They never execute Windows installers or connect to a VPN.
+
+The native desktop check uses the actual command bridge on this PC. It checks prerequisite detection, reusing the installed WSL/Docker/images, invalid credentials, deferring and reopening setup, persistence after restart, and absence of credential-file instructions in Settings. It refuses to run setup actions unless all existing prerequisites are already ready. To test a release executable, set `REGIONBOX_TEST_EXE` to its full path and `REGIONBOX_TEST_PORTABLE=1` before running the desktop test. Portable mode omits the credentials-path override and checks that the installed app selects its own data directory.
+
+### Fresh Windows verification still needed
+
+Use a separate supported Windows PC or VM without Docker/WSL. Verify the RegionBox installer and WebView2 bootstrap, WSL approval and restart/resume, the official Docker download and signature, Docker's terms screen, image download/retry, and a real NordVPN connection. Also check canceled administrator approval and disabled virtualization. This development PC already has WSL and Docker, so the UI fixtures and reuse checks do not establish that the fresh installation path has passed.
 
 ## Build and core behavior
 

@@ -4,6 +4,20 @@ A small Windows desktop app for independent regional browser sessions. The first
 
 Each workspace runs a Chromium container and a dedicated Gluetun/NordVPN container. Browser profiles are stored in separate Docker volumes. Stopping a workspace preserves its data.
 
+## Install and share
+
+Share the Windows installer in `src-tauri/target/release/bundle/nsis/`. Recipients do not need Node.js, Rust, the source project, or your credentials. The installer installs RegionBox for the current Windows user and installs WebView2 if needed. This prototype is unsigned.
+
+On first launch, **Setup** walks through five steps:
+
+1. **Windows support:** checks WSL and virtualization. **Set up this PC** installs or updates missing WSL support using Windows' administrator prompt. Restart Windows when asked, then reopen RegionBox.
+2. **Docker Desktop:** downloads Docker's official installer, checks its Windows signature, installs it for the current user, and opens Docker. Complete any terms or first-run prompts in Docker's window. RegionBox waits for its Linux engine and Compose to respond.
+3. **Browser files:** downloads the VPN and Chromium images. Existing installations and downloaded images are reused.
+4. **NordVPN:** enter service credentials directly in the app.
+5. **First browser:** choose a country, connect, and check the detected IP country before opening the embedded browser.
+
+The app cannot enable virtualization in BIOS/UEFI, accept an administrator prompt for you, or restart your PC automatically. It explains when these actions are needed. **Set up later** opens the workspace screen; return through **Settings → Setup & checks**. Setup does not show local credential-file paths.
+
 ## Run from source
 
 Prerequisites: Docker Desktop using Linux containers and WSL2, Node.js 22.12+, Rust, Microsoft C++ build tools, and WebView2.
@@ -13,7 +27,7 @@ rtk npm ci
 rtk npm run desktop
 ```
 
-The three country workspaces are created on first launch. Open **Settings** and enter your NordVPN **service credentials**, available in Nord Account → NordVPN → Manual setup. These differ from your normal email and password.
+The three country workspaces are created on first launch. Follow Setup or open **Settings** and enter your NordVPN **service credentials**, available in Nord Account → NordVPN → Manual setup. These differ from your normal email and password.
 
 During development you can fill `.env` in the project root instead. Copy `.env.example` to `.env` if needed. The app reads it again whenever you start a workspace or refresh status. Never commit this file or share it in chat.
 
@@ -37,7 +51,7 @@ For an installer:
 rtk npm run desktop:build
 ```
 
-The installer is written to `src-tauri/target/release/bundle/nsis/`. Docker Desktop remains a separate prerequisite. The app is unsigned in this prototype.
+The installer is written to `src-tauri/target/release/bundle/nsis/`. The first-run setup installs Docker Desktop separately when it is missing. The app is unsigned in this prototype.
 
 The installed app stores settings and credentials under `%LOCALAPPDATA%\com.regionbox.desktop`. It does not include your development `.env`. Enter the service credentials in the installed app's Settings.
 
@@ -76,5 +90,7 @@ Native UI, Chromium viewer, and live VPN verification are documented in `docs/te
 - [Gluetun NordVPN configuration](https://github.com/qdm12/gluetun-wiki/blob/main/setup/providers/nordvpn.md)
 - [LinuxServer Chromium](https://docs.linuxserver.io/images/docker-chromium/)
 - [shadcn Vite setup](https://ui.shadcn.com/docs/installation/vite)
+- [Docker Desktop Windows installation and installer flags](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Windows WSL installation commands](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
 
 The UI uses components generated from shadcn's official registry. RegionBox manages interactive sessions; browsing and account sign-in are manual.
