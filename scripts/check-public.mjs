@@ -16,13 +16,13 @@ for (const email of emails) {
   if (!email.endsWith('@users.noreply.github.com')) failures.push('Git history includes a private author/committer email; use a GitHub no-reply address.');
 }
 const example = readFileSync('.env.example', 'utf8');
-if (/^NORDVPN_SERVICE_(?:USER|PASSWORD)\s*=\s*\S+/m.test(example)) failures.push('.env.example: credential placeholders must be empty');
+if (/^NORDVPN_SERVICE_(?:USER|PASSWORD)[ \t]*=[ \t]*[^ \t\r\n]+/m.test(example)) failures.push('.env.example: credential placeholders must be empty');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const tauri = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
 const cargo = readFileSync('src-tauri/Cargo.toml', 'utf8').match(/^version = "([^"]+)"/m)?.[1];
 if (pkg.version !== tauri.version || pkg.version !== cargo) failures.push('Package, Tauri, and Cargo release versions differ.');
 if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${pkg.version}`) failures.push('Release tag does not match the app version.');
-if (tauri.bundle.resources?.length || tauri.bundle.externalBin?.length) failures.push('Review newly bundled files before publishing.');
+if (Object.keys(tauri.bundle.resources ?? {}).length || tauri.bundle.externalBin?.length) failures.push('Review newly bundled files before publishing.');
 if (failures.length) {
   console.error([...new Set(failures)].join('\n'));
   process.exitCode = 1;
