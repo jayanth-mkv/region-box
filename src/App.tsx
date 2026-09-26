@@ -15,6 +15,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Onboarding } from '@/components/onboarding';
+import { NordCredentialsGuide } from '@/components/nord-credentials-guide';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { countries, type SetupStatus, type Snapshot, type Workspace } from './types';
 
@@ -158,9 +159,10 @@ export default function App() {
             <TabsContent value="settings" className="min-h-0 flex-1 overflow-auto p-5">
               <div className="max-w-xl space-y-5">
                 <Card>
-                  <CardHeader><CardTitle>NordVPN connection</CardTitle><CardDescription>Use the service credentials from Nord Account → NordVPN → Manual setup.</CardDescription></CardHeader>
+                  <CardHeader><CardTitle>NordVPN connection</CardTitle></CardHeader>
                   <CardContent>
                     <div className="mb-5 flex items-center gap-2"><Badge variant={data?.credentialsReady ? 'default' : 'secondary'}>{data?.credentialsReady ? 'Credentials saved' : 'Credentials needed'}</Badge><span className="text-xs text-muted-foreground">Verified when a workspace connects</span></div>
+                    <div className="mb-5"><NordCredentialsGuide onOpen={() => void action('Opening Nord Account', () => invoke('open_setup_help', { topic: 'nord' }))} /></div>
                     <form onSubmit={save} className="space-y-4">
                       <div className="space-y-2"><Label htmlFor="service-user">Service username</Label><Input id="service-user" value={user} onChange={e => setUser(e.target.value)} autoComplete="off" spellCheck={false} required placeholder="Your NordVPN service username" /></div>
                       <div className="space-y-2"><Label htmlFor="service-password">Service password</Label><Input id="service-password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" required placeholder="Your NordVPN service password" /></div>

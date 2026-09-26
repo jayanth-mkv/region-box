@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Progress } from '@/components/ui/progress';
 import { countries, type SetupStatus, type Snapshot } from '@/types';
+import { NordCredentialsGuide } from '@/components/nord-credentials-guide';
 
 type Props = { initial: SetupStatus; data: Snapshot; refresh: () => Promise<void>; onLeave: (workspaceId?: string) => void; onBusy: (busy: boolean) => void };
 const steps = ['Windows support', 'Docker Desktop', 'Browser files', 'NordVPN', 'First browser'];
@@ -123,8 +124,7 @@ export function Onboarding({ initial, data, refresh, onLeave, onBusy }: Props) {
                     <Button disabled={busy} onClick={() => void run(() => invoke('run_setup', { action: 'images' }))}>{busy ? <LoaderCircle className="animate-spin motion-reduce:animate-none" /> : null}Download browser files</Button>
                   </>}
                   {step === 3 && <>
-                    <p className="text-sm leading-6 text-muted-foreground">In Nord Account, open NordVPN → Manual setup and copy your service credentials. They are different from your account email and password.</p>
-                    <Button size="sm" variant="outline" onClick={() => help('nord')}><ExternalLink />Open Nord Account</Button>
+                    <NordCredentialsGuide onOpen={() => help('nord')} />
                     <form onSubmit={save} className="space-y-4">
                       <div className="space-y-2"><Label htmlFor="setup-user">Service username</Label><Input id="setup-user" autoComplete="off" spellCheck={false} value={username} onChange={e => setUsername(e.target.value)} placeholder="Your NordVPN service username" required /></div>
                       <div className="space-y-2"><Label htmlFor="setup-password">Service password</Label><Input id="setup-password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your NordVPN service password" required /></div>
