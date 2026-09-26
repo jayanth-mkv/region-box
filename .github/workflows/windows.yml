@@ -47,10 +47,10 @@ jobs:
           save-if: ${{ github.event_name != 'pull_request' }}
       - name: Install locked frontend dependencies
         run: npm ci
-      - name: Rust unit checks
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --features tauri/custom-protocol
       - name: Build Windows installer
         run: npm run desktop:build -- --ci
+      - name: Rust unit checks
+        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --lib --features tauri/custom-protocol
       - name: Onboarding and browser layout checks
         run: node scripts/test-onboarding.mjs
       - name: Prepare installer and checksum
