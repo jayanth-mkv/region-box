@@ -1,7 +1,26 @@
 pub mod core;
+pub mod setup;
 use core::{Manager, NetworkCheck, Snapshot, Workspace};
+use setup::{SetupManager, SetupStatus};
 use std::{path::PathBuf, sync::Arc};
 use tauri::{Manager as _, State};
+
+#[tauri::command]
+async fn setup_status(setup: State<'_, Arc<SetupManager>>) -> Result<SetupStatus, String> {
+    Ok(setup.status().await)
+}
+#[tauri::command]
+async fn run_setup(action: String, setup: State<'_, Arc<SetupManager>>) -> Result<(), String> {
+    setup.run(&action).await
+}
+#[tauri::command]
+async fn dismiss_setup(setup: State<'_, Arc<SetupManager>>) -> Result<(), String> {
+    setup.dismiss().await
+}
+#[tauri::command]
+async fn open_setup_help(topic: String) -> Result<(), String> {
+    setup::open_help(&topic).await
+}
 
 #[tauri::command]
 async fn snapshot(manager: State<'_, Arc<Manager>>) -> Result<Snapshot, String> {
@@ -51,7 +70,11 @@ async fn quit_app(
     stop: bool,
     app: tauri::AppHandle,
     manager: State<'_, Arc<Manager>>,
+    setup: State<'_, Arc<SetupManager>>,
 ) -> Result<(), String> {
+    if setup.is_busy().await {
+        return Err("Wait for the current setup step to finish before closing RegionBox.".into());
+    }
     if stop {
         manager.stop_all().await?;
     }
@@ -79,6 +102,7 @@ pub fn run() {
                         None
                     }
                 });
+            app.manage(SetupManager::new(root.clone()).map_err(std::io::Error::other)?);
             app.manage(Manager::new(root, credentials).map_err(std::io::Error::other)?);
             Ok(())
         })
@@ -91,7 +115,11 @@ pub fn run() {
             save_credentials,
             verify_workspace,
             workspace_logs,
-            quit_app
+            quit_app,
+            setup_status,
+            run_setup,
+            dismiss_setup,
+            open_setup_help
         ])
         .run(tauri::generate_context!())
         .expect("RegionBox could not start");

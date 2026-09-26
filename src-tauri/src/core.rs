@@ -138,8 +138,8 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
     fs::rename(&temporary, path).map_err(io_error)
 }
 
-fn docker() -> Command {
-    let mut cmd = Command::new("docker");
+pub(crate) fn docker() -> Command {
+    let mut cmd = Command::new(crate::setup::docker_cli());
     #[cfg(windows)]
     {
         cmd.args(["--context", "desktop-linux"]);
@@ -173,9 +173,7 @@ async fn docker_args(args: &[&str], seconds: u64) -> Result<String> {
 
 fn credentials(path: &Path) -> Result<(String, String)> {
     let values: HashMap<String, String> = dotenvy::from_path_iter(path)
-        .map_err(|_| {
-            "Add NordVPN service credentials in Settings or the local .env file.".to_string()
-        })?
+        .map_err(|_| "Add NordVPN service credentials in Settings.".to_string())?
         .collect::<std::result::Result<_, _>>()
         .map_err(|_| {
             "The credentials file is not valid. Save your service credentials again in Settings."
