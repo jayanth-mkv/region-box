@@ -8,3 +8,18 @@ src-tauri/target/
 test-results/
 playwright-report/
 *.log
+# Local account data, browser profiles, and exports must never be published.
+**/nord-user
+**/nord-password
+**/workspaces.json
+**/vpn.ovpn
+**/Cookies
+**/Cookies-journal
+**/Login Data
+**/Login Data-journal
+**/Local State
+*.pfx
+*.p12
+*.pem
+*.key
+.ci-tools/

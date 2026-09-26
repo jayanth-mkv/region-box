@@ -1,12 +1,14 @@
 # RegionBox
 
-A small Windows desktop app for independent regional browser sessions. Supported countries: **India, United States, United Kingdom, Australia, Canada, United Arab Emirates, France, Singapore, Germany, and Netherlands**. Each workspace has a separate Chromium profile (up to 10 configured workspaces).
+A lightweight Windows desktop app for independent regional browser sessions. Supported countries: **India, United States, United Kingdom, Australia, Canada, United Arab Emirates, France, Singapore, Germany, and Netherlands**. Each workspace has a separate Chromium profile (up to 10 configured workspaces).
 
 Each workspace runs a Chromium container and a dedicated Gluetun/NordVPN container. Browser profiles are stored in separate Docker volumes. Stopping a workspace preserves its data.
 
 RegionBox asks NordVPN for current OpenVPN server recommendations in the selected country, tries them in recommendation order, and downloads the current connection files automatically. No server addresses or configuration files are needed from you. Recommendations are not a guarantee of the fastest possible speed; the app checks connectivity rather than benchmarking every server.
 
 ## Install and share
+
+Download the setup EXE from [GitHub Releases](https://github.com/jayanth-mkv/region-box/releases/latest). Share that release link or the installer. Each person enters their own NordVPN service credentials; no account data is included.
 
 Share the Windows installer in `src-tauri/target/release/bundle/nsis/`. Recipients do not need Node.js, Rust, the source project, or your credentials. The installer installs RegionBox for the current Windows user and installs WebView2 if needed. This prototype is unsigned.
 
@@ -39,6 +41,12 @@ Select a workspace and click **Start workspace**. First use downloads the browse
 
 ## Build a Windows installer
 
+GitHub Actions builds a Windows x64 installer on pushes to `main`/`dev`, pull requests to `main`, and manual runs. Download **RegionBox-VERSION-windows-x64** from the completed [Windows installer workflow](https://github.com/jayanth-mkv/region-box/actions/workflows/windows.yml). A successful `vVERSION` tag build publishes the EXE and `SHA256SUMS.txt` to GitHub Releases, where anyone can download them without signing in.
+
+The workflow scans Git history for secrets, checks publication safety, runs Rust unit tests and UI fixtures, then packages the app. It requires no NordVPN credentials and does not upload logs, screenshots, profiles, or the source workspace. Native Docker/VPN checks remain local; GitHub's Windows runner does not run those checks.
+
+For a release, update the version in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`, commit, then push an annotated `vVERSION` tag. The workflow rejects a tag that differs from the app version. Already published installers are not overwritten.
+
 For a quick standalone prototype executable:
 
 ```powershell
@@ -59,7 +67,8 @@ The installed app stores settings and credentials under `%LOCALAPPDATA%\com.regi
 
 ## Controls
 
-- **Create workspace:** adds another independent profile in any of the three supported countries.
+- **Create workspace:** adds another independent profile in any of the ten supported countries.
+- **Full screen / Exit full screen:** expands the browser inside the app while keeping an exit button visible.
 - **Start / Stop:** controls only the selected browser and VPN pair.
 - **Stop all:** stops all workspaces owned by this RegionBox installation.
 - **Reload view:** reconnects the viewer without restarting Chromium.
@@ -74,6 +83,8 @@ The installed app stores settings and credentials under `%LOCALAPPDATA%\com.regi
 - NordVPN credentials are stored locally as plain text. Compose mounts credential files as secrets; passwords are not embedded in the Compose document or passed on command lines.
 - Each browser shares only its own VPN's network namespace. Its DNS resolver points to Gluetun in that namespace. IPv6 is disabled for this MVP.
 - Gluetun's firewall remains enabled. Browsers start only after the VPN health check passes.
+- Chromium's internal sandbox remains enabled. Password saving is disabled; use your password manager. Camera and microphone forwarding are disabled.
+- After installing a browser update, stop and start existing workspaces once to apply it. Saved profiles remain intact.
 - Browser viewer ports bind only to `127.0.0.1` and require a private per-workspace access token, which RegionBox supplies automatically. This version is for use on the same PC.
 - Windows commands target Docker Desktop's `desktop-linux` context. No host VPN switching is required.
 - Each running workspace uses one VPN connection and consumes additional RAM. Start two first on a busy 16 GB PC.
@@ -86,6 +97,8 @@ rtk npm run test:core
 ```
 
 Native UI, Chromium viewer, and live VPN verification are documented in `docs/testing.md`. The live country, reconnect, and VPN-loss checks require valid NordVPN service credentials. A successful build alone does not establish those checks passed.
+
+Before publishing, run `npm run check:public`. Read [SECURITY.md](SECURITY.md) for private-data handling and commit-email privacy.
 
 ## References
 
