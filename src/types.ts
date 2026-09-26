@@ -9,3 +9,10 @@ export type Snapshot = {
   credentialsPath: string; dataPath: string; workspaces: Workspace[];
 };
 export const countries: Record<string, string> = { US: 'United States', DE: 'Germany', GB: 'United Kingdom' };
+
+export type SetupStatus = {
+  checked: boolean; supported: boolean; virtualization: boolean; windowsReady: boolean;
+  dockerInstalled: boolean; dockerReady: boolean; vpnImageReady: boolean; browserImageReady: boolean;
+  dismissed: boolean; restartRequired: boolean; busy: boolean; phase: string; detail: string;
+  error: string | null; downloaded: number; total: number | null;
+};

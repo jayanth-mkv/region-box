@@ -19,6 +19,8 @@ Use the preset's bundled Geist Variable font and standard Tailwind type scale. R
 
 A narrow workspace list, a compact toolbar, and a browser stage that receives most of the window. Setup appears inline in standard Card and form components. At narrow widths the workspace list moves above the stage and controls wrap.
 
+First-run onboarding is a dedicated page with a numbered progress list and one active step in a standard Card. Show measured download progress where available and a spinner with the current action otherwise. Preserve progress across restarts, provide retry and defer actions, and make setup available again from Settings. Keep developer paths and file-editing instructions out of credential entry.
+
 ## Elevation & Depth
 
 Preserve the standard shadcn component surfaces and borders.

@@ -14,9 +14,9 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Onboarding } from '@/components/onboarding';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
-import { countries, type Snapshot, type Workspace } from './types';
+import { countries, type SetupStatus, type Snapshot, type Workspace } from './types';
 
 const stateLabel: Record<Workspace['state'], string> = {
   stopped: 'Stopped', starting: 'Starting', stopping: 'Stopping', running: 'Running',
@@ -39,6 +39,9 @@ export default function App() {
   const [logs, setLogs] = useState<string | null>(null);
   const [frameVersion, setFrameVersion] = useState(0);
   const [closing, setClosing] = useState(false);
+  const [setup, setSetup] = useState<SetupStatus | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+  const [setupWorking, setSetupWorking] = useState(false);
   const refreshing = useRef(false);
   const current = data?.workspaces.find(w => w.id === selected) ?? data?.workspaces[0];
   const running = data?.workspaces.filter(w => w.state === 'running').length ?? 0;
@@ -54,6 +57,7 @@ export default function App() {
 
   useEffect(() => {
     void refresh();
+    if (isTauri()) void invoke<SetupStatus>('setup_status').then(status => { setSetup(status); setShowSetup(!status.dismissed); }).catch(e => setError(String(e)));
     const timer = window.setInterval(() => void refresh(), 4000);
     return () => window.clearInterval(timer);
   }, [refresh]);
@@ -91,6 +95,14 @@ export default function App() {
     if (current) void action('Starting workspace', () => invoke('start_workspace', { id: current.id }));
   };
 
+  const openSetup = () => void action('Checking setup', async () => {
+    setSetup(await invoke<SetupStatus>('setup_status')); setShowSetup(true);
+  });
+
+  const closeDialog = <AlertDialog open={closing} onOpenChange={setClosing}>
+    <AlertDialogContent className="sm:max-w-lg"><AlertDialogHeader><AlertDialogTitle>Close RegionBox?</AlertDialogTitle><AlertDialogDescription>{setupWorking ? 'A setup step is running. Wait for it to finish before closing RegionBox.' : 'You can stop all workspaces now, or leave them running in Docker. Browser data is saved either way.'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><Button variant="outline" disabled={working || setupWorking} onClick={() => void action('Closing RegionBox', () => invoke('quit_app', { stop: false }))}>Keep running and exit</Button><AlertDialogAction disabled={working || setupWorking} onClick={event => { event.preventDefault(); void action('Stopping workspaces', () => invoke('quit_app', { stop: true })); }}>Stop all and exit</AlertDialogAction></AlertDialogFooter>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</AlertDialogContent>
+  </AlertDialog>;
+
   if (!isTauri()) return (
     <main className="grid min-h-svh place-items-center bg-muted/30 p-6">
       <Card className="w-full max-w-lg">
@@ -99,6 +111,10 @@ export default function App() {
       </Card>
     </main>
   );
+
+  if (!setup?.checked || !data) return <><main className="grid h-svh place-items-center p-6"><Card className="w-full max-w-lg"><CardHeader><CardTitle>Opening RegionBox</CardTitle><CardDescription>{error || 'Checking this PC and your saved workspaces…'}</CardDescription></CardHeader>{error && <CardContent><Button onClick={() => window.location.reload()}>Try again</Button></CardContent>}</Card></main>{closeDialog}</>;
+
+  if (showSetup) return <><Onboarding initial={setup} data={data} refresh={refresh} onBusy={setSetupWorking} onLeave={id => { setShowSetup(false); if (id) { setSelected(id); setTab('workspace'); } }} />{closeDialog}</>;
 
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-background text-foreground">
@@ -134,7 +150,7 @@ export default function App() {
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {error && <div className="shrink-0 px-5 pt-4"><Alert variant="destructive"><CircleAlert /><AlertTitle>Could not complete the action</AlertTitle><AlertDescription><p className="whitespace-pre-wrap break-words">{error}</p><Button size="sm" variant="outline" onClick={() => setError('')}>Dismiss</Button></AlertDescription></Alert></div>}
-          {data && !data.dockerReady && <div className="shrink-0 px-5 pt-4"><Alert><CircleAlert /><AlertTitle>Start Docker Desktop</AlertTitle><AlertDescription>{data.dockerMessage}</AlertDescription></Alert></div>}
+          {data && !data.dockerReady && <div className="shrink-0 px-5 pt-4"><Alert><CircleAlert /><AlertTitle>Set up Docker Desktop</AlertTitle><AlertDescription><p>{data.dockerMessage}</p><Button size="sm" disabled={working} onClick={openSetup}>Open setup</Button></AlertDescription></Alert></div>}
 
           <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
             <div className="shrink-0 px-5 pt-4"><TabsList><TabsTrigger value="workspace">Browser</TabsTrigger><TabsTrigger value="settings">Settings</TabsTrigger></TabsList></div>
@@ -151,12 +167,9 @@ export default function App() {
                       <Button type="submit" disabled={working || !user.trim() || !password.trim()}>Save credentials</Button>
                       {saved && <p role="status" className="text-sm">Saved. You can now start a workspace.</p>}
                     </form>
-                    <Separator className="my-5" />
-                    <p className="text-sm text-muted-foreground">You can also edit the local credentials file, then refresh. Credentials are stored as plain text on this PC.</p>
-                    <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{data?.credentialsPath}</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={() => void refresh()}><RefreshCw />Recheck credentials</Button>
                   </CardContent>
                 </Card>
+                <Card><CardHeader><CardTitle>Setup & checks</CardTitle><CardDescription>Prepare Windows, start Docker, download browser files, and check your first connection.</CardDescription></CardHeader><CardContent><Button variant="outline" disabled={working} onClick={openSetup}>Open setup</Button></CardContent></Card>
                 <Card><CardHeader><CardTitle>Browser data</CardTitle><CardDescription>Each workspace keeps its own cookies, history, and downloads in a Docker volume. Stopping a workspace preserves this data.</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">Workspace settings</p><p className="mt-2 break-all font-mono text-xs">{data?.dataPath}</p></CardContent></Card>
               </div>
             </TabsContent>
@@ -192,9 +205,7 @@ export default function App() {
         </main>
       </div>
 
-      <AlertDialog open={closing} onOpenChange={setClosing}>
-        <AlertDialogContent className="sm:max-w-lg"><AlertDialogHeader><AlertDialogTitle>Close RegionBox?</AlertDialogTitle><AlertDialogDescription>You can stop all workspaces now, or leave them running in Docker. Browser data is saved either way.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={working}>Cancel</AlertDialogCancel><Button variant="outline" disabled={working} onClick={() => void action('Closing RegionBox', () => invoke('quit_app', { stop: false }))}>Keep running and exit</Button><AlertDialogAction disabled={working} onClick={event => { event.preventDefault(); void action('Stopping workspaces', () => invoke('quit_app', { stop: true })); }}>Stop all and exit</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
+      {closeDialog}
       <span role="status" className="sr-only">{busy}</span>
     </div>
   );

@@ -20,7 +20,7 @@ A Tauri Windows desktop app hosts the web interface. Docker Desktop runs Linux c
 
 ## Capabilities and Constraints
 
-The first version must actually start, stop, and display browsers concurrently through different countries. Browser data must survive restarts. VPN loss must block direct internet access. VPN service credentials are supplied locally. This is a personal desktop prototype; mobile and managed container installation are future work.
+The first version must actually start, stop, and display browsers concurrently through different countries. Browser data must survive restarts. VPN loss must block direct internet access. VPN service credentials are entered inside the app. Onboarding checks and installs Windows/Docker prerequisites, downloads images, and guides the first connection. Windows approval, restart, BIOS configuration, and Docker's own terms remain user actions. Mobile is future work.
 
 ## Brand Commitments
 

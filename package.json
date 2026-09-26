@@ -11,6 +11,7 @@
     "desktop:build": "tauri build --bundles nsis",
     "test:core": "cargo test --manifest-path src-tauri/Cargo.toml --lib --features tauri/custom-protocol",
     "test:desktop": "node scripts/test-desktop.mjs",
+    "test:onboarding": "node scripts/test-onboarding.mjs",
     "test:viewer": "node scripts/test-viewer.mjs",
     "desktop:prototype": "tauri build --debug --no-bundle"
   },
