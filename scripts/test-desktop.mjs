@@ -21,6 +21,7 @@ async function launch() {
   let launchError;
   app.on('error', error => { launchError = error; });
   let browser;
+  try {
   for (let attempt = 0; attempt < 90; attempt++) {
     if (launchError) throw launchError;
     if (app.exitCode !== null) throw new Error(`RegionBox exited with code ${app.exitCode}`);
@@ -37,8 +38,35 @@ async function launch() {
   if (!page) throw new Error('RegionBox did not open a window.');
   const errors = [];
   page.on('pageerror', error => errors.push(String(error)));
-  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true }).or(page.getByRole('heading', { name: 'Set up your regional browsers' }))).toBeVisible({ timeout: 60000 });
+  if (await page.getByRole('heading', { name: 'Set up your regional browsers' }).isVisible()) {
+    await expect(page.getByRole('navigation', { name: 'Setup progress' })).toBeVisible();
+    await expect(page.getByText('Connect your NordVPN account', { exact: true })).toBeVisible();
+    await page.screenshot({ path: 'test-results/onboarding-native.png' });
+    // This machine already has prerequisites. Confirm the real setup commands reuse them.
+    const checks = await page.evaluate(async () => {
+      const invoke = window.__TAURI_INTERNALS__.invoke;
+      const before = await invoke('setup_status');
+      if (!before.windowsReady || !before.dockerReady || !before.vpnImageReady || !before.browserImageReady) throw new Error('Native test requires the existing Docker/image installation.');
+      await invoke('run_setup', { action: 'prepare' });
+      await invoke('run_setup', { action: 'images' });
+      return invoke('setup_status');
+    });
+    expect(checks.busy).toBe(false);
+    expect(checks.error).toBeNull();
+    await page.getByLabel('Service username').fill('account@example.com');
+    await page.getByLabel('Service password').fill('test-only-password');
+    await page.getByRole('button', { name: 'Save and continue' }).click();
+    await expect(page.getByText("Use NordVPN's service username, rather than your email address.")).toBeVisible();
+    await page.getByRole('button', { name: 'Set up later' }).click();
+  }
+  await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
   return { app, browser, page, errors };
+  } catch (error) {
+    if (browser) await browser.close().catch(() => {});
+    if (app.exitCode === null) app.kill();
+    throw error;
+  }
 }
 
 async function close(session) {
@@ -69,6 +97,12 @@ try {
   await page.getByRole('button', { name: 'Save credentials' }).click();
   await expect(page.getByText('Saved. You can now start a workspace.')).toBeVisible();
   await expect(page.getByLabel('Service password')).toHaveValue('');
+  await expect(page.getByText(/You can also edit the local credentials file/)).toHaveCount(0);
+  await expect(page.getByText(/\.env/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Open setup', exact: true }).click();
+  await expect(page.getByText('Open your first browser', { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.getByLabel('First workspace').selectOption('gb');
+  await page.getByRole('button', { name: 'Set up later' }).click();
 
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Second Germany');
@@ -84,6 +118,7 @@ try {
   await close(session); session = null;
 
   session = await launch();
+  await expect(session.page.getByRole('heading', { name: 'Set up your regional browsers' })).toHaveCount(0);
   await expect(session.page.getByRole('navigation', { name: 'Workspaces' }).getByRole('button', { name: /Second Germany/ })).toBeVisible({ timeout: 30000 });
   const config = JSON.parse(await readFile(resolve(root, 'workspaces.json'), 'utf8'));
   expect(config.workspaces).toHaveLength(4);
