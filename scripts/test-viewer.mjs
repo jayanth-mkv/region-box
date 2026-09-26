@@ -6,22 +6,41 @@ import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomBytes } from 'node:crypto';
+import { resolve } from 'node:path';
 
 const image = 'lscr.io/linuxserver/chromium@sha256:cf6200ccdcb224feaf5d3bde4ce45b3783c926a7496c98059cae1e0db78e5b2f';
 const container = `regionbox-viewer-test-${Date.now()}`;
+const profile = `${container}-profile`;
 const viewerToken = randomBytes(32).toString('hex');
 const docker = (...args) => execFileSync('docker', ['--context', 'desktop-linux', ...args], { encoding: 'utf8', windowsHide: true, timeout: 90000 });
 let browser;
 let server;
 let page;
 let created = false;
-try {
+let profileCreated = false;
+const startContainer = (volume = profile) => {
   docker('run', '--detach', '--name', container, '--shm-size', '1g', '--memory', '1500m',
-    '--publish', '127.0.0.1:32990:3000', '--env', 'CHROME_CLI=--no-first-run --remote-debugging-port=9222 --user-data-dir=/config/viewer-test-profile about:blank',
-    '--env', 'SELKIES_AUDIO_ENABLED=false', '--env', 'SELKIES_FRAMERATE=10',
+    '--security-opt', `seccomp=${resolve('src-tauri/browser/seccomp.json')}`,
+    '--volume', `${resolve('src-tauri/browser/chromium-browser')}:/usr/bin/wrapped-chromium:ro`,
+    '--volume', `${resolve('src-tauri/browser/policies.json')}:/etc/chromium/policies/managed/regionbox.json:ro`,
+    '--volume', `${resolve('scripts/browser-probe.py')}:/tmp/browser-probe.py:ro`,
+    '--volume', volume ? `${volume}:/config` : '/config',
+    '--publish', '127.0.0.1:32990:3000', '--env', 'CHROME_CLI=--no-first-run --remote-debugging-port=9222 --remote-allow-origins=http://localhost --user-data-dir=/config/viewer-test-profile about:blank',
+    '--env', 'SELKIES_AUDIO_ENABLED=true', '--env', 'SELKIES_COMMAND_ENABLED=false|locked', '--env', 'SELKIES_FRAMERATE=10',
     '--env', `SELKIES_MASTER_TOKEN=${viewerToken}`,
-    '--env', 'SELKIES_ENABLE_SHARING=false', '--env', 'SELKIES_ALLOWED_ORIGINS=http://127.0.0.1:32990', image);
+    '--env', 'SELKIES_ENABLE_SHARING=false|locked', '--env', 'SELKIES_ALLOWED_ORIGINS=http://127.0.0.1:32990', image);
   created = true;
+};
+const probe = action => docker('exec', container, 'python3', '/tmp/browser-probe.py', action).trim();
+const waitForBrowser = async () => {
+  await expect.poll(() => {
+    try { return JSON.parse(docker('exec', container, 'curl', '-fsS', 'http://127.0.0.1:9222/json/list')).some(t => t.type === 'page'); }
+    catch { return false; }
+  }, { timeout: 60000 }).toBe(true);
+};
+try {
+  docker('volume', 'create', profile); profileCreated = true;
+  startContainer();
   let ready = false;
   for (let i = 0; i < 90; i++) {
     try { const response = await fetch('http://127.0.0.1:32990/api/health', { signal: AbortSignal.timeout(1000) }); if (response.ok) { ready = true; break; } } catch { /* Starting. */ }
@@ -83,6 +102,25 @@ try {
   expect(unauthenticated).toBe('rejected');
   console.log('PASS: real Chromium viewer embeds in a secure loopback page, streams video, and accepts mouse/keyboard navigation.');
   console.log('PASS: the viewer rejects a WebSocket connection without its private token.');
+  const sandbox = probe('sandbox');
+  expect(sandbox).toMatch(/Layer 1 Sandbox\s+Namespace/);
+  expect(sandbox).toMatch(/PID namespaces\s+Yes/);
+  expect(sandbox).toMatch(/Network namespaces\s+Yes/);
+  expect(sandbox).toMatch(/Seccomp-BPF sandbox\s+Yes/);
+  console.log('PASS: Chromium reports namespace and seccomp-BPF sandboxes enabled.');
+  probe('seed');
+  await delay(2000);
+  docker('rm', '--force', container); created = false;
+  startContainer();
+  await waitForBrowser();
+  expect(JSON.parse(probe('cookies'))).toEqual([{ name: 'regionbox_test', value: 'persisted' }]);
+  console.log('PASS: a persistent login cookie survives browser container recreation.');
+  docker('rm', '--force', container); created = false;
+  // An anonymous, fresh profile must never see the first workspace's cookie.
+  startContainer(null);
+  await waitForBrowser();
+  expect(JSON.parse(probe('cookies'))).toEqual([]);
+  console.log('PASS: a fresh browser profile cannot see another profile\'s cookie.');
   if (websocketErrors.length) console.log(`Viewer recovered from ${websocketErrors.length} initial connection retry.`);
   console.log('This viewer-only test does not verify NordVPN routing.');
 } catch (error) {
@@ -96,5 +134,6 @@ try {
 } finally {
   if (browser) await browser.close();
   if (server) await new Promise(resolve => server.close(resolve));
-  if (created) docker('rm', '--force', container);
+  if (created) docker('rm', '--force', '--volumes', container);
+  if (profileCreated) docker('volume', 'rm', profile);
 }

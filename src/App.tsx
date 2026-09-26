@@ -186,7 +186,7 @@ export default function App() {
                   </CardContent>
                 </Card>
                 <Card><CardHeader><CardTitle>Setup & checks</CardTitle><CardDescription>Prepare Windows, start Docker, download browser files, and check your first connection.</CardDescription></CardHeader><CardContent><Button variant="outline" disabled={working} onClick={openSetup}>Open setup</Button></CardContent></Card>
-                <Card><CardHeader><CardTitle>Browser data</CardTitle><CardDescription>Each workspace keeps its own cookies, history, and downloads in a Docker volume. Stopping a workspace preserves this data.</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">Workspace settings</p><p className="mt-2 break-all font-mono text-xs">{data?.dataPath}</p></CardContent></Card>
+                <Card><CardHeader><CardTitle>Browser data</CardTitle><CardDescription>Each workspace keeps its own cookies, history, and downloads. Stopping a workspace preserves this data. Keep passwords in your password manager; browser password saving is disabled. Camera and microphone are unavailable.</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">Workspace settings</p><p className="mt-2 break-all font-mono text-xs">{data?.dataPath}</p></CardContent></Card>
               </div>
             </TabsContent>
 

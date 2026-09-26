@@ -1,0 +1,8 @@
+#!/bin/sh
+# Keep Chromium's namespace and seccomp sandboxes enabled. The container's
+# seccomp profile permits the user namespaces Chromium needs for this.
+# Reuse the upstream profile path so existing login sessions are preserved.
+if ! pgrep -x chromium >/dev/null; then
+  rm -f /config/.config/chromium/SingletonLock /config/.config/chromium/SingletonCookie /config/.config/chromium/SingletonSocket
+fi
+exec /usr/bin/chromium --start-maximized --user-data-dir=/config/.config/chromium "$@"

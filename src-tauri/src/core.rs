@@ -292,18 +292,23 @@ pub fn compose_document(owner: &str, workspace: &Workspace) -> Result<Value> {
             "browser": {
                 "image": BROWSER_IMAGE, "container_name": format!("{project}-browser"),
                 "network_mode": "service:vpn",
+                "security_opt": ["seccomp=./browser-seccomp.json"],
                 "depends_on": {"vpn": {"condition": "service_healthy"}},
                 "environment": {
                     "PUID": "1000", "PGID": "1000", "TZ": "Etc/UTC",
                     "TITLE": format!("RegionBox · {}", workspace.name.replace('$', "$$")),
                     "CHROME_CLI": "--no-first-run --disable-dev-shm-usage https://example.com",
-                    "SELKIES_FRAMERATE": "20", "SELKIES_AUDIO_ENABLED": "false",
-                    "SELKIES_MICROPHONE_ENABLED": "false", "SELKIES_ENABLE_SHARING": "false",
+                    "SELKIES_FRAMERATE": "20", "SELKIES_AUDIO_ENABLED": "true",
+                    "SELKIES_MICROPHONE_ENABLED": "false|locked", "SELKIES_ENABLE_SHARING": "false|locked",
+                    "SELKIES_COMMAND_ENABLED": "false|locked", "PELORUS": "false",
+                    "SELKIES_FILE_MANAGER_PATH": "/config/Downloads",
                     "SELKIES_MASTER_TOKEN": workspace.viewer_token,
                     "SELKIES_ALLOWED_ORIGINS": format!("http://127.0.0.1:{}", workspace.port),
                     "NO_GAMEPAD": "true", "NO_WEBCAM": "true"
                 },
-                "volumes": ["profile:/config", "./resolv.conf:/etc/resolv.conf:ro"],
+                "volumes": ["profile:/config", "./resolv.conf:/etc/resolv.conf:ro",
+                    "./chromium-browser:/usr/bin/wrapped-chromium:ro",
+                    "./browser-policies.json:/etc/chromium/policies/managed/regionbox.json:ro"],
                 "shm_size": "1gb", "mem_limit": "2g",
                 "healthcheck": {"test":["CMD", "curl", "-fsS", "--max-time", "3", "http://127.0.0.1:3000/api/health"], "interval":"10s", "timeout":"5s", "start_period":"40s", "retries":12},
                 "labels": labels, "restart": "unless-stopped"
@@ -657,6 +662,9 @@ impl Manager {
             "nameserver 127.0.0.1\noptions timeout:2 attempts:2\n",
         )
         .map_err(io_error)?;
+        fs::write(directory.join("browser-seccomp.json"), include_str!("../browser/seccomp.json")).map_err(io_error)?;
+        fs::write(directory.join("chromium-browser"), include_str!("../browser/chromium-browser")).map_err(io_error)?;
+        fs::write(directory.join("browser-policies.json"), include_str!("../browser/policies.json")).map_err(io_error)?;
         write_json(
             &directory.join("compose.json"),
             &compose_document(owner, workspace)?,

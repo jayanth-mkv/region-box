@@ -1,5 +1,19 @@
 # Verification
 
+## Browser safety and full screen — 27 September 2026, v0.1.1
+
+- Passed: viewer keyboard/mouse navigation and streaming with the sandbox enabled; unauthenticated viewer WebSockets are rejected.
+- Passed: Chromium's own `chrome://sandbox` page reports namespace, PID, network, and seccomp-BPF sandboxes enabled. The previous image launcher disabled the sandbox; RegionBox now replaces that launcher and supplies the restricted Chromium-compatible seccomp profile.
+- Passed: an HttpOnly persistent test cookie survived removal and recreation of its browser container. A separate fresh profile could not read it. These tests use disposable profiles and never inspect personal browser data.
+- Passed: a real US VPN browser uses Gluetun's loopback DNS and has IPv6 disabled. Pausing only its VPN container blocked an external IP request; access recovered after resuming the tunnel. The user's two running workspaces were untouched.
+- Passed: browser-frame bounds and no document overflow at 760×560, 1280×820, and 1920×1080; onboarding fixtures and ten Rust unit checks.
+- Browser password saving is disabled because the container has no OS password vault. Audio playback is enabled; camera and microphone forwarding remain disabled. Download/file transfer navigation starts in `/config/Downloads`.
+- Running workspaces need one stop/start after installing this release to apply the browser changes. Existing profile volumes are reused.
+
+Run `rtk npm run test:viewer` for sandbox, cookie persistence/isolation, and viewer checks. With `REGIONBOX_ENV_FILE` pointing at locally saved service credentials, run `rtk cargo run --manifest-path src-tauri/Cargo.toml --example check_connection --features tauri/custom-protocol -- --safety` for the isolated VPN interruption check.
+
+Limits: these checks do not log into real social-media accounts, establish compatibility with every site's login challenge, test file upload/download end to end, or exhaustively measure WebRTC/DNS leaks. The pinned browser image needs future security updates through app releases. A fresh-PC Windows/WSL/Docker installation remains untested.
+
 ## Credential checks and country selection — 27 September 2026
 
 - Passed: the saved service credentials established a real US VPN connection, including through the app's new temporary connection check.
@@ -21,7 +35,7 @@ It checks the saved login, starts separate US/DE/GB browsers, checks their exit 
 
 Use `--countries IN,AU,CA,AE,FR,SG,NL` instead of `--workspaces` to test additional countries sequentially. With the same credentials path set, `node scripts/test-credentials.mjs` checks the real credentials step in the release app, using separate test settings. Set `REGIONBOX_TEST_EXE` to test an installed executable.
 
-Still pending: a fresh Windows machine installation, browser cookie persistence across container recreation, and dedicated DNS/IPv6/WebRTC and VPN-loss checks. Live country routing does not establish those checks passed.
+The later v0.1.1 checks above cover cookie persistence and a VPN interruption. Fresh Windows installation and exhaustive leak testing remain pending.
 
 ## Onboarding and installer results — 27 September 2026
 
