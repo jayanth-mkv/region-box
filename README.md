@@ -1,10 +1,36 @@
-# RegionBox
+<p align="center">
+  <img src="src-tauri/icons/app.svg" width="72" height="72" alt="" />
+</p>
 
-A lightweight Windows desktop app for independent regional browser sessions. Supported countries: **India, United States, United Kingdom, Australia, Canada, United Arab Emirates, France, Singapore, Germany, and Netherlands**. Each workspace has a separate Chromium profile (up to 10 configured workspaces).
+<h1 align="center">RegionBox</h1>
 
-Each workspace runs a Chromium container and a dedicated Gluetun/NordVPN container. Browser profiles are stored in separate Docker volumes. Stopping a workspace preserves its data.
+<p align="center">Independent browser workspaces. Different countries. One desktop.</p>
 
-RegionBox asks NordVPN for current OpenVPN server recommendations in the selected country, tries them in recommendation order, and downloads the current connection files automatically. No server addresses or configuration files are needed from you. Recommendations are not a guarantee of the fastest possible speed; the app checks connectivity rather than benchmarking every server.
+<p align="center">
+  <a href="https://github.com/jayanth-mkv/region-box/releases/latest"><img src="https://img.shields.io/github/v/release/jayanth-mkv/region-box?style=flat-square&amp;label=release" alt="Latest release" /></a>
+  <a href="https://github.com/jayanth-mkv/region-box/actions/workflows/windows.yml"><img src="https://github.com/jayanth-mkv/region-box/actions/workflows/windows.yml/badge.svg?branch=main" alt="Windows build status" /></a>
+  <a href="#install-and-share"><img src="https://img.shields.io/badge/platform-Windows_x64-0078D4?style=flat-square" alt="Windows x64" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/jayanth-mkv/region-box/releases/latest"><strong>Download for Windows</strong></a>
+  &nbsp;·&nbsp;
+  <a href="#install-and-share">Getting started</a>
+  &nbsp;·&nbsp;
+  <a href="#run-from-source">Build from source</a>
+  &nbsp;·&nbsp;
+  <a href="SECURITY.md">Security</a>
+</p>
+
+<p align="center">Run several Chromium sessions at once, each with its own NordVPN connection and saved browser profile.</p>
+
+<p align="center">
+  <img src="docs/images/regionbox-preview.png" width="100%" alt="RegionBox with a United States browser open to example.com, country workspaces in the sidebar, and full-screen controls." />
+</p>
+
+<p align="center"><sub>A Chromium workspace running inside RegionBox.</sub></p>
+
+---
 
 ## Install and share
 
@@ -21,6 +47,14 @@ On first launch, **Setup** walks through five steps:
 5. **First browser:** choose a country, connect, and check the detected IP country before opening the embedded browser.
 
 The app cannot enable virtualization in BIOS/UEFI, accept an administrator prompt for you, or restart your PC automatically. It explains when these actions are needed. **Set up later** opens the workspace screen; return through **Settings → Setup & checks**. Setup does not show local credential-file paths.
+
+## Countries and workspaces
+
+**India · United States · United Kingdom · Australia · Canada · United Arab Emirates · France · Singapore · Germany · Netherlands**
+
+Create up to 10 independent workspaces. Each has its own Chromium profile and VPN connection; stopping one preserves its browser data and leaves the others running.
+
+RegionBox selects NordVPN's recommended servers and downloads connection files automatically. No manual server configuration is needed. Recommendations do not guarantee the fastest speed; the app checks connectivity rather than benchmarking every server.
 
 ## Run from source
 
