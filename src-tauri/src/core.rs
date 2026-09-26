@@ -774,24 +774,15 @@ impl Manager {
         let (owner, _) = self.workspace(id).await?;
         let container = format!("regionbox-{owner}-{id}-browser");
         self.checks.lock().await.remove(id);
-        let trace = docker_args(
-            &[
-                "exec",
-                &container,
-                "curl",
-                "-fsS",
-                "--max-time",
-                "15",
-                "https://www.cloudflare.com/cdn-cgi/trace",
-            ],
-            20,
-        )
-        .await
-        .map_err(|_| {
-            "Could not verify the browser IP. Check the connection and try Check IP again."
-                .to_string()
-        })?;
-        let check = parse_trace(&trace)?;
+        let mut verified = None;
+        // The marketing website can challenge VPN addresses. Cloudflare's resolver
+        // endpoint provides the same trace without relying on that site's policy.
+        for endpoint in ["https://1.1.1.1/cdn-cgi/trace", "https://www.cloudflare.com/cdn-cgi/trace"] {
+            if let Ok(trace) = docker_args(&["exec", &container, "curl", "-fsS", "--connect-timeout", "8", "--max-time", "15", endpoint], 20).await {
+                if let Ok(check) = parse_trace(&trace) { verified = Some(check); break; }
+            }
+        }
+        let check = verified.ok_or("Could not verify the browser IP. Check the connection and try Check IP again.")?;
         self.checks.lock().await.insert(id.into(), check.clone());
         Ok(check)
     }
