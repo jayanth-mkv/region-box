@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '1422', '--strictPort'], { windowsHide: true, stdio: 'ignore' });
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '1422', '--strictPort'], { windowsHide: true, stdio: 'ignore' });
 let browser;
 try {
   for (let attempt = 0; attempt < 30; attempt++) {
@@ -19,7 +19,7 @@ try {
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
     const state = {
       setup: { checked: true, supported: true, virtualization: true, windowsReady: false, dockerInstalled: false, dockerReady: false, vpnImageReady: false, browserImageReady: false, dismissed: false, restartRequired: false, busy: false, phase: '', detail: '', error: null, downloaded: 0, total: null },
-      data: { dockerReady: false, dockerMessage: 'Start Docker Desktop', credentialsReady: false, credentialsPath: 'TEST-ONLY/.env', dataPath: 'TEST-ONLY', workspaces: [
+      data: { dockerReady: false, dockerMessage: 'Start Docker Desktop', credentialsReady: false, credentialsVerified: false, credentialsPath: 'TEST-ONLY/.env', dataPath: 'TEST-ONLY', workspaces: [
         { id: 'us', name: 'United States', country: 'US', port: 32101, state: 'stopped', detail: 'Browser data is saved', browserUrl: null, network: null },
         { id: 'de', name: 'Germany', country: 'DE', port: 32102, state: 'stopped', detail: 'Browser data is saved', browserUrl: null, network: null },
         { id: 'gb', name: 'United Kingdom', country: 'GB', port: 32103, state: 'stopped', detail: 'Browser data is saved', browserUrl: null, network: null },
@@ -43,7 +43,14 @@ try {
           await new Promise((resolve, reject) => { state.resolve = (error) => { state.setup.busy = false; if (error) { state.setup.error = error; reject(error); } else resolve(); }; });
           return;
         }
-        if (command === 'save_credentials') { state.data.credentialsReady = true; return; }
+        if (command === 'save_credentials' || command === 'check_saved_credentials') {
+          state.data.credentialsVerified = false;
+          await new Promise((resolve, reject) => { state.resolve = error => {
+            if (error) reject(error);
+            else { state.data.credentialsReady = true; state.data.credentialsVerified = true; resolve(); }
+          }; });
+          return;
+        }
         if (command === 'dismiss_setup') { state.setup.dismissed = true; return; }
         if (command === 'start_workspace') {
           const workspace = state.data.workspaces.find(workspace => workspace.id === args.id);
@@ -85,7 +92,28 @@ try {
   await expect(page.getByText('Connect your NordVPN account', { exact: true })).toBeVisible();
   await page.getByLabel('Service username').fill('test-only-service-user');
   await page.getByLabel('Service password').fill('test-only-password');
-  await page.getByRole('button', { name: 'Save and continue' }).click();
+  await page.getByRole('button', { name: 'Check and continue' }).click();
+  await expect(page.getByRole('button', { name: 'Checking credentials…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Set up later' })).toBeDisabled();
+  await expect(page.getByText('Open your first browser', { exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.__setupFixture.resolve('NordVPN rejected this login. Check both service credentials and try again.'));
+  await expect(page.getByText(/NordVPN rejected this login/)).toBeVisible();
+  await expect(page.getByLabel('Service username')).toHaveValue('test-only-service-user');
+  await expect(page.getByText('Connect your NordVPN account', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/onboarding-credential-error.png' });
+  await page.getByRole('button', { name: 'Check and continue' }).click();
+  await page.evaluate(() => window.__setupFixture.resolve());
+  await expect(page.getByText('NordVPN credentials verified.', { exact: true })).toBeVisible();
+  // On reopening the app, saved values must be checked before proceeding.
+  await page.evaluate(() => { window.__setupFixture.data.credentialsVerified = false; });
+  await page.getByRole('button', { name: 'Recheck setup' }).click();
+  await expect(page.getByRole('button', { name: 'Check saved credentials' })).toBeVisible();
+  await page.getByRole('button', { name: 'Check saved credentials' }).click();
+  await page.evaluate(() => window.__setupFixture.resolve('Could not connect to a NordVPN server. Your credentials could not be verified.'));
+  await expect(page.getByText(/Your credentials could not be verified/)).toBeVisible();
+  await expect(page.getByText('Open your first browser', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Check saved credentials' }).click();
+  await page.evaluate(() => window.__setupFixture.resolve());
   await expect(page.getByText('Open your first browser', { exact: true })).toBeVisible();
   await expect(page.getByText(/\.env/)).toHaveCount(0);
   await page.getByLabel('First workspace').selectOption('de');

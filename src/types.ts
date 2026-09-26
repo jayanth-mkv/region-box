@@ -5,7 +5,7 @@ export type Workspace = {
   network: { ip: string; country: string; checkedAt: number } | null;
 };
 export type Snapshot = {
-  dockerReady: boolean; dockerMessage: string; credentialsReady: boolean;
+  dockerReady: boolean; dockerMessage: string; credentialsReady: boolean; credentialsVerified: boolean;
   credentialsPath: string; dataPath: string; workspaces: Workspace[];
 };
 export const countries: Record<string, string> = { US: 'United States', DE: 'Germany', GB: 'United Kingdom' };

@@ -13,7 +13,7 @@ On first launch, **Setup** walks through five steps:
 1. **Windows support:** checks WSL and virtualization. **Set up this PC** installs or updates missing WSL support using Windows' administrator prompt. Restart Windows when asked, then reopen RegionBox.
 2. **Docker Desktop:** downloads Docker's official installer, checks its Windows signature, installs it for the current user, and opens Docker. Complete any terms or first-run prompts in Docker's window. RegionBox waits for its Linux engine and Compose to respond.
 3. **Browser files:** downloads the VPN and Chromium images. Existing installations and downloaded images are reused.
-4. **NordVPN:** enter service credentials directly in the app.
+4. **NordVPN:** enter service credentials and select **Check and continue**. Setup tests a real VPN connection before saving them or continuing. Saved credentials can be checked again without re-entering them.
 5. **First browser:** choose a country, connect, and check the detected IP country before opening the embedded browser.
 
 The app cannot enable virtualization in BIOS/UEFI, accept an administrator prompt for you, or restart your PC automatically. It explains when these actions are needed. **Set up later** opens the workspace screen; return through **Settings → Setup & checks**. Setup does not show local credential-file paths.
@@ -27,7 +27,7 @@ rtk npm ci
 rtk npm run desktop
 ```
 
-The three country workspaces are created on first launch. Follow Setup or open **Settings** and enter your NordVPN **service credentials**, available in Nord Account → NordVPN → Manual setup. These differ from your normal email and password.
+The three country workspaces are created on first launch. Follow Setup or open **Settings** and enter your NordVPN **service credentials**, available in Nord Account → NordVPN → Set up NordVPN manually. These differ from your normal email and password. Both screens include a short guide and a link to Nord Account. The connection check can take a few minutes as unavailable servers are retried; login rejection and connection failure show different messages. Verification is repeated after reopening the app.
 
 During development you can fill `.env` in the project root instead. Copy `.env.example` to `.env` if needed. The app reads it again whenever you start a workspace or refresh status. Never commit this file or share it in chat.
 

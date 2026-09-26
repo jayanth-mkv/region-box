@@ -86,7 +86,7 @@ export default function App() {
 
   const save = (event: FormEvent) => {
     event.preventDefault();
-    void action('Saving credentials', async () => {
+    void action('Checking NordVPN credentials', async () => {
       await invoke('save_credentials', { user, password });
       setUser(''); setPassword(''); setSaved(true);
     });
@@ -161,13 +161,14 @@ export default function App() {
                 <Card>
                   <CardHeader><CardTitle>NordVPN connection</CardTitle></CardHeader>
                   <CardContent>
-                    <div className="mb-5 flex items-center gap-2"><Badge variant={data?.credentialsReady ? 'default' : 'secondary'}>{data?.credentialsReady ? 'Credentials saved' : 'Credentials needed'}</Badge><span className="text-xs text-muted-foreground">Verified when a workspace connects</span></div>
-                    <div className="mb-5"><NordCredentialsGuide onOpen={() => void action('Opening Nord Account', () => invoke('open_setup_help', { topic: 'nord' }))} /></div>
+                    <div className="mb-5 flex flex-wrap items-center gap-2"><Badge variant={data?.credentialsVerified ? 'default' : 'secondary'}>{data?.credentialsVerified ? 'Credentials verified' : data?.credentialsReady ? 'Credentials saved · check needed' : 'Credentials needed'}</Badge>{data?.credentialsReady && <Button size="sm" variant="outline" disabled={working} onClick={() => void action('Checking NordVPN credentials', () => invoke('check_saved_credentials'))}>Check saved credentials</Button>}</div>
+                    <div className="mb-5"><NordCredentialsGuide onOpen={() => void invoke('open_setup_help', { topic: 'nord' }).catch(e => setError(String(e)))} /></div>
                     <form onSubmit={save} className="space-y-4">
-                      <div className="space-y-2"><Label htmlFor="service-user">Service username</Label><Input id="service-user" value={user} onChange={e => setUser(e.target.value)} autoComplete="off" spellCheck={false} required placeholder="Your NordVPN service username" /></div>
-                      <div className="space-y-2"><Label htmlFor="service-password">Service password</Label><Input id="service-password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" required placeholder="Your NordVPN service password" /></div>
-                      <Button type="submit" disabled={working || !user.trim() || !password.trim()}>Save credentials</Button>
-                      {saved && <p role="status" className="text-sm">Saved. You can now start a workspace.</p>}
+                      <div className="space-y-2"><Label htmlFor="service-user">Service username</Label><Input id="service-user" disabled={working} value={user} onChange={e => setUser(e.target.value)} autoComplete="off" spellCheck={false} required placeholder="Your NordVPN service username" /></div>
+                      <div className="space-y-2"><Label htmlFor="service-password">Service password</Label><Input id="service-password" disabled={working} type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" required placeholder="Your NordVPN service password" /></div>
+                      <Button type="submit" disabled={working || !user.trim() || !password.trim()}>Check and save credentials</Button>
+                      {busy === 'Checking NordVPN credentials' && <p role="status" className="text-sm text-muted-foreground">Checking your credentials with NordVPN. This can take up to four minutes.</p>}
+                      {saved && <p role="status" className="text-sm">Credentials verified and saved. You can now start a workspace.</p>}
                     </form>
                   </CardContent>
                 </Card>

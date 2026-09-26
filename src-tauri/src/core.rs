@@ -96,6 +96,7 @@ pub struct Snapshot {
     pub docker_ready: bool,
     pub docker_message: String,
     pub credentials_ready: bool,
+    pub credentials_verified: bool,
     pub credentials_path: String,
     pub data_path: String,
     pub workspaces: Vec<WorkspaceView>,
@@ -109,6 +110,7 @@ pub struct Manager {
     phases: Mutex<HashMap<String, (String, String)>>,
     checks: Mutex<HashMap<String, NetworkCheck>>,
     last_logs: Mutex<HashMap<String, String>>,
+    verified_credentials: Mutex<Option<(String, String)>>,
 }
 
 fn io_error(e: impl std::fmt::Display) -> String {
@@ -205,6 +207,34 @@ fn validate_credentials(user: &str, password: &str) -> Result<()> {
         return Err("Use NordVPN's service username, rather than your email address.".into());
     }
     Ok(())
+}
+
+fn vpn_failure(logs: &str) -> String {
+    if logs.lines().any(|line| line.contains("[openvpn]") && line.contains("AUTH_FAILED")) {
+        "NordVPN rejected this login. Check both service credentials and your active NordVPN subscription, then try again.".into()
+    } else if logs.contains("Initialization Sequence Completed") {
+        "NordVPN accepted the login, but the VPN connection did not become ready. Check your internet connection and retry.".into()
+    } else {
+        "Could not connect to a NordVPN server. Your credentials could not be verified. Check your internet connection and retry.".into()
+    }
+}
+
+async fn wait_for_vpn(container: &str) -> Result<()> {
+    let mut logs = String::new();
+    let mut authenticated = false;
+    // Gluetun may report unhealthy while retrying an unavailable server.
+    // Give it time to establish a tunnel, but fail promptly on a login rejection.
+    for _ in 0..80 {
+        logs = docker_args(&["logs", "--tail", "200", container], 10).await?;
+        authenticated |= logs.contains("Initialization Sequence Completed");
+        let failure = vpn_failure(&logs);
+        if failure.starts_with("NordVPN rejected") { return Err(failure); }
+        let state = docker_args(&["inspect", "--format", "{{.State.Status}} {{.State.Health.Status}}", container], 10).await?;
+        if state.trim() == "running healthy" && authenticated { return Ok(()); }
+        if state.starts_with("exited") { return Err(failure); }
+        tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+    Err(vpn_failure(&logs))
 }
 
 pub fn compose_document(owner: &str, workspace: &Workspace) -> Result<Value> {
@@ -311,6 +341,7 @@ impl Manager {
             phases: Mutex::new(HashMap::new()),
             checks: Mutex::new(HashMap::new()),
             last_logs: Mutex::new(HashMap::new()),
+            verified_credentials: Mutex::new(None),
         }))
     }
 
@@ -460,10 +491,14 @@ impl Manager {
                 }
             })
             .collect();
+        let saved_credentials = credentials(&self.credentials_path).ok();
+        let credentials_verified = saved_credentials.is_some()
+            && saved_credentials.as_ref() == self.verified_credentials.lock().await.as_ref();
         Snapshot {
             docker_ready,
             docker_message,
-            credentials_ready: credentials(&self.credentials_path).is_ok(),
+            credentials_ready: saved_credentials.is_some(),
+            credentials_verified,
             credentials_path: self.credentials_path.display().to_string(),
             data_path: self.root.display().to_string(),
             workspaces,
@@ -478,6 +513,8 @@ impl Manager {
         let user = user.trim();
         let password = password.trim();
         validate_credentials(user, password)?;
+        *self.verified_credentials.lock().await = None;
+        self.probe_credentials(user, password).await?;
         if let Some(parent) = self.credentials_path.parent() {
             fs::create_dir_all(parent).map_err(io_error)?;
         }
@@ -485,7 +522,64 @@ impl Manager {
             &self.credentials_path,
             format!("NORDVPN_SERVICE_USER='{user}'\nNORDVPN_SERVICE_PASSWORD='{password}'\n"),
         )
-        .map_err(io_error)
+        .map_err(io_error)?;
+        *self.verified_credentials.lock().await = Some((user.into(), password.into()));
+        Ok(())
+    }
+
+    pub fn is_busy(&self) -> bool {
+        self.operation.try_lock().is_err()
+    }
+
+    pub async fn check_saved_credentials(&self) -> Result<()> {
+        let _operation = self.operation.try_lock()
+            .map_err(|_| "Wait for the current workspace action to finish.")?;
+        let (user, password) = credentials(&self.credentials_path)?;
+        *self.verified_credentials.lock().await = None;
+        self.probe_credentials(&user, &password).await?;
+        *self.verified_credentials.lock().await = Some((user, password));
+        Ok(())
+    }
+
+    async fn probe_credentials(&self, user: &str, password: &str) -> Result<()> {
+        // Use the same VPN configuration as a workspace, without starting a browser
+        // or publishing a port. A check never replaces an existing workspace.
+        let owner = uuid::Uuid::new_v4().simple().to_string()[..8].to_string();
+        let directory = self.root.join(format!("credential-check-{owner}"));
+        let path = directory.join("compose.json");
+        let workspace = Workspace { id: "check".into(), name: "Credential check".into(),
+            country: "US".into(), port: 32100, viewer_token: new_viewer_token() };
+        let mut document = compose_document(&owner, &workspace)?;
+        document["services"].as_object_mut().unwrap().remove("browser");
+        document.as_object_mut().unwrap().remove("volumes");
+        document["services"]["vpn"].as_object_mut().unwrap().remove("ports");
+        document["services"]["vpn"]["restart"] = json!("no");
+        let container = format!("regionbox-{owner}-check-vpn");
+        let result: Result<()> = async {
+            docker_args(&["image", "inspect", "--format", "{{.Id}}", VPN_IMAGE], 15).await
+                .map_err(|_| "Start Docker and download the VPN files in Setup, then check your credentials again.")?;
+            fs::create_dir_all(&directory).map_err(io_error)?;
+            fs::write(directory.join("nord-user"), user).map_err(io_error)?;
+            fs::write(directory.join("nord-password"), password).map_err(io_error)?;
+            write_json(&path, &document)?;
+            let mut command = docker();
+            command.args(["compose", "--file"]).arg(&path).args(["up", "--detach", "vpn"]);
+            execute(command, 40).await.map_err(|_| "Could not start the credential check. Check Docker Desktop and retry.")?;
+            wait_for_vpn(&container).await
+        }.await;
+        let cleanup = if path.exists() {
+            let mut command = docker();
+            command.args(["compose", "--file"]).arg(&path).args(["down", "--timeout", "5"]);
+            execute(command, 30).await.map(|_| ())
+        } else { Ok(()) };
+        for file in ["nord-user", "nord-password", "compose.json", "compose.tmp"] {
+            let _ = fs::remove_file(directory.join(file));
+        }
+        let _ = fs::remove_dir(&directory);
+        if cleanup.is_err() {
+            return Err("The credential check could not clean up its temporary connection. Restart Docker Desktop before retrying.".into());
+        }
+        result.map_err(|message| message.replace(user, "[redacted]").replace(password, "[redacted]"))
     }
 
     pub async fn create(&self, name: String, country: String) -> Result<Workspace> {
@@ -547,7 +641,7 @@ impl Manager {
             .try_lock()
             .map_err(|_| "Wait for the current workspace action to finish.")?;
         let (owner, workspace) = self.workspace(id).await?;
-        credentials(&self.credentials_path)?;
+        let login = credentials(&self.credentials_path)?;
         self.phase(id, "starting", "Preparing workspace").await;
         self.checks.lock().await.remove(id);
         let result: Result<()> = async {
@@ -558,10 +652,14 @@ impl Manager {
                     docker_args(&["pull", image], 900).await?;
                 }
             }
-            self.phase(id, "starting", "Connecting NordVPN and starting Chromium").await;
+            self.phase(id, "starting", "Connecting NordVPN. Trying another server can take a few minutes.").await;
             // Recreate the pair together: a replacement VPN means a new network namespace.
             // Named profile volumes survive `down` because --volumes is never used.
             self.compose(id, &["down", "--timeout", "10"], 60).await?;
+            self.compose(id, &["up", "--detach", "vpn"], 40).await?;
+            wait_for_vpn(&format!("regionbox-{owner}-{id}-vpn")).await?;
+            *self.verified_credentials.lock().await = Some(login);
+            self.phase(id, "starting", "NordVPN is connected. Starting Chromium").await;
             self.compose(id, &["up", "--detach", "--wait", "--wait-timeout", "180"], 210).await?;
             self.phase(id, "starting", "Checking the browser connection").await;
             let url = format!("http://127.0.0.1:{}/", workspace.port);
@@ -575,9 +673,12 @@ impl Manager {
             let logs = self.logs(id).await.unwrap_or_default();
             self.last_logs.lock().await.insert(id.into(), logs.clone());
             let cleanup = self.compose(id, &["down", "--timeout", "10"], 60).await;
-            let mut message = self.redact(&error);
-            if logs.contains("AUTH_FAILED") {
-                message = "NordVPN rejected the credentials. Copy the service credentials from Nord Account and save them in Settings.".into();
+            let mut message = if error.contains("vpn") && (error.contains("unhealthy") || error.contains("dependency")) {
+                vpn_failure(&logs)
+            } else { self.redact(&error) };
+            if logs.lines().any(|line| line.contains("[openvpn]") && line.contains("AUTH_FAILED")) {
+                message = vpn_failure(&logs);
+                *self.verified_credentials.lock().await = None;
             }
             if cleanup.is_err() {
                 message
@@ -771,6 +872,13 @@ mod tests {
         assert!(validate_credentials("service", "value\nOTHER=1").is_err());
         assert!(validate_credentials("", "password").is_err());
         assert!(validate_credentials("service-user", "test-password").is_ok());
+    }
+    #[test]
+    fn vpn_errors_distinguish_login_rejection_from_connection_failure() {
+        assert!(vpn_failure("INFO [openvpn] AUTH: Received control message: AUTH_FAILED").contains("rejected"));
+        assert!(vpn_failure("Help: AUTH_FAILED can mean expired credentials").contains("could not be verified"));
+        assert!(vpn_failure("INFO [openvpn] TLS key negotiation failed").contains("could not be verified"));
+        assert!(vpn_failure("INFO [openvpn] Initialization Sequence Completed\nDNS timeout").contains("accepted the login"));
     }
     #[tokio::test]
     async fn new_workspaces_persist_and_do_not_share_ports() {

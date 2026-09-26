@@ -24,13 +24,14 @@ export function Onboarding({ initial, data, refresh, onLeave, onBusy }: Props) {
   const [password, setPassword] = useState('');
   const [workspaceId, setWorkspaceId] = useState(data.workspaces[0]?.id ?? 'us');
   const [changeCredentials, setChangeCredentials] = useState(false);
+  const [checkingCredentials, setCheckingCredentials] = useState(false);
   const polling = useRef(false);
   const selected = data.workspaces.find(workspace => workspace.id === workspaceId);
   const connected = selected?.state === 'running';
   const verified = connected && selected.network?.country === selected.country;
   const activeWorkspace = data.workspaces.find(workspace => ['starting', 'stopping'].includes(workspace.state));
   const busy = pending || setup.busy || !!activeWorkspace;
-  const ready = [setup.windowsReady, setup.dockerReady, setup.vpnImageReady && setup.browserImageReady, data.credentialsReady && !changeCredentials, !!verified];
+  const ready = [setup.windowsReady, setup.dockerReady, setup.vpnImageReady && setup.browserImageReady, data.credentialsVerified && !changeCredentials && !checkingCredentials, !!verified];
   const complete = ready.every(Boolean);
   const next = ready.findIndex(value => !value);
   const step = next === -1 ? 4 : next;
@@ -65,15 +66,23 @@ export function Onboarding({ initial, data, refresh, onLeave, onBusy }: Props) {
   const save = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      await invoke('save_credentials', { user: username, password });
-      setUsername(''); setPassword(''); setChangeCredentials(false);
+      setCheckingCredentials(true);
+      try {
+        await invoke('save_credentials', { user: username, password });
+        setUsername(''); setPassword(''); setChangeCredentials(false);
+      } finally { setCheckingCredentials(false); }
     });
   };
+  const checkSavedCredentials = () => void run(async () => {
+    setCheckingCredentials(true);
+    try { await invoke('check_saved_credentials'); }
+    finally { setCheckingCredentials(false); }
+  });
   const leave = async () => {
     try { await invoke('dismiss_setup'); onLeave(verified ? workspaceId : undefined); }
     catch (e) { setError(String(e)); }
   };
-  const details = activeWorkspace?.detail ?? (setup.busy ? setup.detail : pending ? 'Checking your setup…' : '');
+  const details = checkingCredentials ? 'Checking your credentials with NordVPN. This can take up to four minutes while servers are tried.' : activeWorkspace?.detail ?? (setup.busy ? setup.detail : pending ? 'Checking your setup…' : '');
   const problem = error || setup.error;
   const percent = setup.total ? Math.min(100, Math.round(setup.downloaded / setup.total * 100)) : undefined;
 
@@ -125,13 +134,19 @@ export function Onboarding({ initial, data, refresh, onLeave, onBusy }: Props) {
                   </>}
                   {step === 3 && <>
                     <NordCredentialsGuide onOpen={() => help('nord')} />
-                    <form onSubmit={save} className="space-y-4">
-                      <div className="space-y-2"><Label htmlFor="setup-user">Service username</Label><Input id="setup-user" autoComplete="off" spellCheck={false} value={username} onChange={e => setUsername(e.target.value)} placeholder="Your NordVPN service username" required /></div>
-                      <div className="space-y-2"><Label htmlFor="setup-password">Service password</Label><Input id="setup-password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your NordVPN service password" required /></div>
-                      <Button type="submit" disabled={busy || !username.trim() || !password.trim()}>Save and continue</Button>
+                    <p className="text-sm text-muted-foreground">We’ll test a VPN connection before continuing.</p>
+                    {data.credentialsReady && !changeCredentials ? <div className="space-y-3">
+                      <p className="text-sm">Your saved credentials need a connection check.</p>
+                      <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={checkSavedCredentials}>{checkingCredentials ? 'Checking credentials…' : 'Check saved credentials'}</Button><Button variant="outline" disabled={busy} onClick={() => setChangeCredentials(true)}>Edit credentials</Button></div>
+                    </div> : <form onSubmit={save} className="space-y-4">
+                      <div className="space-y-2"><Label htmlFor="setup-user">Service username</Label><Input id="setup-user" disabled={busy} autoComplete="off" spellCheck={false} value={username} onChange={e => setUsername(e.target.value)} placeholder="Your NordVPN service username" required /></div>
+                      <div className="space-y-2"><Label htmlFor="setup-password">Service password</Label><Input id="setup-password" disabled={busy} type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your NordVPN service password" required /></div>
+                      <Button type="submit" disabled={busy || !username.trim() || !password.trim()}>{checkingCredentials ? 'Checking credentials…' : 'Check and continue'}</Button>
                     </form>
+                    }
                   </>}
                   {step === 4 && <>
+                    <p role="status" className="flex items-center gap-2 text-sm"><Check className="size-4" />NordVPN credentials verified.</p>
                     {verified ? <>
                       <p className="text-sm leading-6">{selected.name} is connected. Its detected location is {countries[selected.network!.country]}.</p>
                       <p className="text-sm leading-6 text-muted-foreground">Open the browser inside RegionBox. You can start more workspaces from the sidebar and keep them running together.</p>

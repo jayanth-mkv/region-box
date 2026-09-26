@@ -60,7 +60,7 @@ async function launch() {
     expect(checks.error).toBeNull();
     await page.getByLabel('Service username').fill('account@example.com');
     await page.getByLabel('Service password').fill('test-only-password');
-    await page.getByRole('button', { name: 'Save and continue' }).click();
+    await page.getByRole('button', { name: 'Check and continue' }).click();
     await expect(page.getByText("Use NordVPN's service username, rather than your email address.")).toBeVisible();
     await page.getByRole('button', { name: 'Set up later' }).click();
   }
@@ -94,18 +94,20 @@ try {
   await expect(page.getByLabel('Service password')).toHaveAttribute('type', 'password');
   await page.getByLabel('Service username').fill('account@example.com');
   await page.getByLabel('Service password').fill('test-only-password');
-  await page.getByRole('button', { name: 'Save credentials' }).click();
+  await page.getByRole('button', { name: 'Check and save credentials' }).click();
   await expect(page.getByText("Use NordVPN's service username, rather than your email address.")).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
-  await page.getByLabel('Service username').fill('test-only-service-user');
-  await page.getByRole('button', { name: 'Save credentials' }).click();
-  await expect(page.getByText('Saved. You can now start a workspace.')).toBeVisible();
-  await expect(page.getByLabel('Service password')).toHaveValue('');
+  // Seed saved values directly to exercise upgrade/restart behavior without
+  // submitting fake credentials to NordVPN. Saving through the UI now verifies live.
+  await writeFile(resolve(root, '.env'), "NORDVPN_SERVICE_USER='test-only-service-user'\nNORDVPN_SERVICE_PASSWORD='test-only-password'\n");
+  await page.getByRole('button', { name: 'Refresh status' }).click();
+  await expect(page.getByText('Credentials saved · check needed', { exact: true })).toBeVisible();
   await expect(page.getByText(/You can also edit the local credentials file/)).toHaveCount(0);
   await expect(page.getByText(/\.env/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Open setup', exact: true }).click();
-  await expect(page.getByText('Open your first browser', { exact: true })).toBeVisible({ timeout: 30000 });
-  await page.getByLabel('First workspace').selectOption('gb');
+  await expect(page.getByText('Connect your NordVPN account', { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('button', { name: 'Check saved credentials' })).toBeVisible();
+  await expect(page.getByText('Open your first browser', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Set up later' }).click();
 
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();

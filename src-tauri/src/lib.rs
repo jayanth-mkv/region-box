@@ -55,6 +55,10 @@ async fn save_credentials(
     manager.save_credentials(user, password).await
 }
 #[tauri::command]
+async fn check_saved_credentials(manager: State<'_, Arc<Manager>>) -> Result<(), String> {
+    manager.check_saved_credentials().await
+}
+#[tauri::command]
 async fn verify_workspace(
     id: String,
     manager: State<'_, Arc<Manager>>,
@@ -74,6 +78,9 @@ async fn quit_app(
 ) -> Result<(), String> {
     if setup.is_busy().await {
         return Err("Wait for the current setup step to finish before closing RegionBox.".into());
+    }
+    if manager.is_busy() {
+        return Err("Wait for the current connection check or workspace action to finish.".into());
     }
     if stop {
         manager.stop_all().await?;
@@ -113,6 +120,7 @@ pub fn run() {
             stop_all,
             create_workspace,
             save_credentials,
+            check_saved_credentials,
             verify_workspace,
             workspace_logs,
             quit_app,
