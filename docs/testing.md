@@ -1,5 +1,21 @@
 # Verification
 
+## Credential checks and country selection — 27 September 2026
+
+- Passed: the saved service credentials established a real US VPN connection, including through the app's new temporary connection check.
+- Passed: 12 Rust checks, including current NordVPN recommendations and valid connection files for all ten countries, and Compose validation for each country.
+- Passed: onboarding fixtures keep failed credential checks on the entry step, allow retry and checking saved values, and create an Indian workspace from the first-browser country picker.
+- Passed: native desktop checks for credential input validation, saved-but-unverified credentials, setup persistence, and workspace creation.
+- Startup now waits for a healthy VPN before creating Chromium. Each start downloads current configurations for NordVPN's recommended servers; the previous bundled server data included outdated addresses and ports.
+
+Run the optional live connection check with `REGIONBOX_ENV_FILE` set to the existing credentials file:
+
+```powershell
+cargo run --manifest-path src-tauri/Cargo.toml --example check_connection --features tauri/custom-protocol -- --workspaces
+```
+
+It checks the saved login, starts separate US/DE/GB browsers, checks their exit countries, and stops its own workspaces afterward. Credentials are not printed or overwritten.
+
 ## Onboarding and installer results — 27 September 2026
 
 - Passed: TypeScript/Vite build, eight Rust checks, and onboarding UI fixtures.
@@ -54,7 +70,7 @@ rtk npm run test:desktop
 
 This launches the actual Windows executable, attaches Playwright to WebView2, and tests the real Rust command bridge. It uses a separate app data directory in `.local/desktop-test-*` and test-only credentials. It does not start a VPN connection or read the real `.env`.
 
-Checks: the three initial countries, disabled start before setup, rejection of account email credentials, saving credentials, clearing the password input, creating an additional German workspace, logs, Stop all, and settings persistence across an app restart. The initial setup screenshot is written to `test-results/desktop-setup.png`.
+Checks: the three initial countries, disabled start before setup, rejection of account email credentials, saved values requiring verification before continuing, creating an additional German workspace, logs, Stop all, and settings persistence across an app restart. The initial setup screenshot is written to `test-results/desktop-setup.png`.
 
 The test enables a local WebView2 debugging port only for the test process. Normal app launches do not enable it.
 

@@ -167,7 +167,7 @@ export default function App() {
                       <div className="space-y-2"><Label htmlFor="service-user">Service username</Label><Input id="service-user" disabled={working} value={user} onChange={e => setUser(e.target.value)} autoComplete="off" spellCheck={false} required placeholder="Your NordVPN service username" /></div>
                       <div className="space-y-2"><Label htmlFor="service-password">Service password</Label><Input id="service-password" disabled={working} type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" required placeholder="Your NordVPN service password" /></div>
                       <Button type="submit" disabled={working || !user.trim() || !password.trim()}>Check and save credentials</Button>
-                      {busy === 'Checking NordVPN credentials' && <p role="status" className="text-sm text-muted-foreground">Checking your credentials with NordVPN. This can take up to four minutes.</p>}
+                      {busy === 'Checking NordVPN credentials' && <p role="status" className="text-sm text-muted-foreground">Checking your credentials with NordVPN. Trying recommended servers can take a few minutes.</p>}
                       {saved && <p role="status" className="text-sm">Credentials verified and saved. You can now start a workspace.</p>}
                     </form>
                   </CardContent>

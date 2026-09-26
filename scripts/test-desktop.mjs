@@ -111,6 +111,7 @@ try {
   await page.getByRole('button', { name: 'Set up later' }).click();
 
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
+  await expect(page.getByLabel('Country', { exact: true }).locator('option')).toHaveCount(10);
   await page.getByLabel('Name', { exact: true }).fill('Second Germany');
   await page.getByLabel('Country', { exact: true }).selectOption('DE');
   await page.getByRole('button', { name: 'Create workspace', exact: true }).last().click();

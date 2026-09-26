@@ -8,7 +8,10 @@ export type Snapshot = {
   dockerReady: boolean; dockerMessage: string; credentialsReady: boolean; credentialsVerified: boolean;
   credentialsPath: string; dataPath: string; workspaces: Workspace[];
 };
-export const countries: Record<string, string> = { US: 'United States', DE: 'Germany', GB: 'United Kingdom' };
+export const countries: Record<string, string> = {
+  IN: 'India', US: 'United States', GB: 'United Kingdom', AU: 'Australia', CA: 'Canada',
+  AE: 'United Arab Emirates', FR: 'France', SG: 'Singapore', DE: 'Germany', NL: 'Netherlands',
+};
 
 export type SetupStatus = {
   checked: boolean; supported: boolean; virtualization: boolean; windowsReady: boolean;

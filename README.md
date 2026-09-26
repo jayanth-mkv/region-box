@@ -1,8 +1,10 @@
 # RegionBox
 
-A small Windows desktop app for independent regional browser sessions. The first version supports **United States, Germany, and United Kingdom**, with as many separate Chromium profiles as you need (up to 10 configured workspaces).
+A small Windows desktop app for independent regional browser sessions. Supported countries: **India, United States, United Kingdom, Australia, Canada, United Arab Emirates, France, Singapore, Germany, and Netherlands**. Each workspace has a separate Chromium profile (up to 10 configured workspaces).
 
 Each workspace runs a Chromium container and a dedicated Gluetun/NordVPN container. Browser profiles are stored in separate Docker volumes. Stopping a workspace preserves its data.
+
+RegionBox asks NordVPN for current OpenVPN server recommendations in the selected country, tries them in recommendation order, and downloads the current connection files automatically. No server addresses or configuration files are needed from you. Recommendations are not a guarantee of the fastest possible speed; the app checks connectivity rather than benchmarking every server.
 
 ## Install and share
 

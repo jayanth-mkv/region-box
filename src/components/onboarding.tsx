@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Progress } from '@/components/ui/progress';
-import { countries, type SetupStatus, type Snapshot } from '@/types';
+import { countries, type SetupStatus, type Snapshot, type Workspace } from '@/types';
 import { NordCredentialsGuide } from '@/components/nord-credentials-guide';
 
 type Props = { initial: SetupStatus; data: Snapshot; refresh: () => Promise<void>; onLeave: (workspaceId?: string) => void; onBusy: (busy: boolean) => void };
@@ -78,11 +78,20 @@ export function Onboarding({ initial, data, refresh, onLeave, onBusy }: Props) {
     try { await invoke('check_saved_credentials'); }
     finally { setCheckingCredentials(false); }
   });
+  const startFirstBrowser = () => void run(async () => {
+    let id = workspaceId;
+    if (id.startsWith('new:')) {
+      const country = id.slice(4);
+      const workspace = await invoke<Workspace>('create_workspace', { name: countries[country], country });
+      id = workspace.id; setWorkspaceId(id); await refresh();
+    }
+    await invoke('start_workspace', { id });
+  });
   const leave = async () => {
     try { await invoke('dismiss_setup'); onLeave(verified ? workspaceId : undefined); }
     catch (e) { setError(String(e)); }
   };
-  const details = checkingCredentials ? 'Checking your credentials with NordVPN. This can take up to four minutes while servers are tried.' : activeWorkspace?.detail ?? (setup.busy ? setup.detail : pending ? 'Checking your setup…' : '');
+  const details = checkingCredentials ? 'Checking your credentials with NordVPN. Trying recommended servers can take a few minutes.' : activeWorkspace?.detail ?? (setup.busy ? setup.detail : pending ? 'Checking your setup…' : '');
   const problem = error || setup.error;
   const percent = setup.total ? Math.min(100, Math.round(setup.downloaded / setup.total * 100)) : undefined;
 
@@ -152,11 +161,11 @@ export function Onboarding({ initial, data, refresh, onLeave, onBusy }: Props) {
                       <p className="text-sm leading-6 text-muted-foreground">Open the browser inside RegionBox. You can start more workspaces from the sidebar and keep them running together.</p>
                       <Button onClick={() => void leave()} disabled={busy}>Open browser</Button>
                     </> : <>
-                      <p className="text-sm leading-6 text-muted-foreground">Choose a country. RegionBox will connect NordVPN, start Chromium, and check the browser’s public IP.</p>
-                      <div className="space-y-2"><Label htmlFor="first-workspace">First workspace</Label><NativeSelect id="first-workspace" value={workspaceId} onChange={e => setWorkspaceId(e.target.value)} disabled={busy}>{data.workspaces.map(workspace => <NativeSelectOption key={workspace.id} value={workspace.id}>{workspace.name}</NativeSelectOption>)}</NativeSelect></div>
+                      <p className="text-sm leading-6 text-muted-foreground">Choose a country. RegionBox uses NordVPN’s recommended servers and handles the connection settings for you.</p>
+                      <div className="space-y-2"><Label htmlFor="first-workspace">First workspace</Label><NativeSelect id="first-workspace" value={workspaceId} onChange={e => setWorkspaceId(e.target.value)} disabled={busy}>{data.workspaces.map(workspace => <NativeSelectOption key={workspace.id} value={workspace.id}>{workspace.name}</NativeSelectOption>)}{Object.entries(countries).filter(([code]) => !data.workspaces.some(workspace => workspace.country === code)).map(([code, name]) => <NativeSelectOption key={code} value={`new:${code}`}>{name}</NativeSelectOption>)}</NativeSelect></div>
                       {connected && <Alert><CircleAlert /><AlertTitle>Browser is running; location needs checking</AlertTitle><AlertDescription>{selected?.network ? `The IP check reported ${selected.network.country}. Your chosen country is ${selected.country}. Restart this workspace or check again.` : 'The location check did not complete. Retry Check IP before continuing.'}</AlertDescription></Alert>}
                       <div className="flex flex-wrap gap-2">
-                        <Button disabled={busy} onClick={() => void run(() => invoke('start_workspace', { id: workspaceId }))}>{busy ? <LoaderCircle className="animate-spin motion-reduce:animate-none" /> : null}{connected ? 'Restart workspace' : 'Start first browser'}</Button>
+                        <Button disabled={busy} onClick={startFirstBrowser}>{busy ? <LoaderCircle className="animate-spin motion-reduce:animate-none" /> : null}{connected ? 'Restart workspace' : 'Start first browser'}</Button>
                         {connected && <Button variant="outline" disabled={busy} onClick={() => void run(() => invoke('verify_workspace', { id: workspaceId }))}>Check IP</Button>}
                         <Button variant="ghost" disabled={busy} onClick={() => setChangeCredentials(true)}>Edit credentials</Button>
                       </div>

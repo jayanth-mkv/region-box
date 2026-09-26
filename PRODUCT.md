@@ -16,11 +16,11 @@ RegionBox manages independent browser workspaces, each with its own browser prof
 
 ## Operating Context
 
-A Tauri Windows desktop app hosts the web interface. Docker Desktop runs Linux containers locally. The user confirmed an existing paid NordVPN subscription, multiple Chromium sessions, and United States, Germany, and United Kingdom for initial testing.
+A Tauri Windows desktop app hosts the web interface. Docker Desktop runs Linux containers locally. The user confirmed an existing paid NordVPN subscription and multiple Chromium sessions. Supported countries are India, United States, United Kingdom, Australia, Canada, United Arab Emirates, France, Singapore, Germany, and Netherlands. The initial three workspaces remain US, Germany, and UK.
 
 ## Capabilities and Constraints
 
-The first version must actually start, stop, and display browsers concurrently through different countries. Browser data must survive restarts. VPN loss must block direct internet access. VPN service credentials are entered inside the app. Onboarding checks and installs Windows/Docker prerequisites, downloads images, and guides the first connection. Windows approval, restart, BIOS configuration, and Docker's own terms remain user actions. Mobile is future work.
+The first version must actually start, stop, and display browsers concurrently through different countries. Browser data must survive restarts. VPN loss must block direct internet access. VPN service credentials are entered and verified inside the app before onboarding continues. RegionBox selects NordVPN's recommended servers and downloads current connection files automatically. Onboarding checks and installs Windows/Docker prerequisites, downloads images, and guides the first connection. Windows approval, restart, BIOS configuration, and Docker's own terms remain user actions. Mobile is future work.
 
 ## Brand Commitments
 

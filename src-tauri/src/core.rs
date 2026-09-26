@@ -12,10 +12,17 @@ use tokio::{process::Command, sync::Mutex, time::timeout};
 
 pub const VPN_IMAGE: &str = "qmcgaw/gluetun:v3.41.0";
 pub const BROWSER_IMAGE: &str = "lscr.io/linuxserver/chromium@sha256:cf6200ccdcb224feaf5d3bde4ce45b3783c926a7496c98059cae1e0db78e5b2f";
-pub const COUNTRIES: [(&str, &str); 3] = [
+pub const COUNTRIES: [(&str, &str); 10] = [
+    ("IN", "India"),
     ("US", "United States"),
-    ("DE", "Germany"),
     ("GB", "United Kingdom"),
+    ("AU", "Australia"),
+    ("CA", "Canada"),
+    ("AE", "United Arab Emirates"),
+    ("FR", "France"),
+    ("SG", "Singapore"),
+    ("DE", "Germany"),
+    ("NL", "Netherlands"),
 ];
 type Result<T> = std::result::Result<T, String>;
 
@@ -127,7 +134,7 @@ fn country_name(code: &str) -> Result<&'static str> {
         .iter()
         .find(|(c, _)| *c == code)
         .map(|(_, name)| *name)
-        .ok_or_else(|| "Choose United States, Germany, or United Kingdom.".into())
+        .ok_or_else(|| "Choose one of the supported countries.".into())
 }
 
 fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
@@ -224,7 +231,7 @@ async fn wait_for_vpn(container: &str) -> Result<()> {
     let mut authenticated = false;
     // Gluetun may report unhealthy while retrying an unavailable server.
     // Give it time to establish a tunnel, but fail promptly on a login rejection.
-    for _ in 0..80 {
+    for _ in 0..30 {
         logs = docker_args(&["logs", "--tail", "200", container], 10).await?;
         authenticated |= logs.contains("Initialization Sequence Completed");
         let failure = vpn_failure(&logs);
@@ -237,8 +244,29 @@ async fn wait_for_vpn(container: &str) -> Result<()> {
     Err(vpn_failure(&logs))
 }
 
+async fn connect_recommended(path: &Path, container: &str, configs: &[String]) -> Result<()> {
+    let mut failure = "No recommended server is available. Retry the connection.".to_string();
+    for (index, config) in configs.iter().enumerate() {
+        if index > 0 {
+            let mut command = docker();
+            command.args(["compose", "--file"]).arg(path).args(["down", "--timeout", "5"]);
+            execute(command, 30).await?;
+        }
+        fs::write(path.with_file_name("vpn.ovpn"), config).map_err(io_error)?;
+        let mut command = docker();
+        command.args(["compose", "--file"]).arg(path).args(["up", "--detach", "vpn"]);
+        execute(command, 40).await?;
+        match wait_for_vpn(container).await {
+            Ok(()) => return Ok(()),
+            Err(error) if error.starts_with("NordVPN rejected") => return Err(error),
+            Err(error) => failure = error,
+        }
+    }
+    Err(failure)
+}
+
 pub fn compose_document(owner: &str, workspace: &Workspace) -> Result<Value> {
-    let country = country_name(&workspace.country)?;
+    country_name(&workspace.country)?;
     let project = format!("regionbox-{owner}-{}", workspace.id);
     let labels = json!({"com.regionbox.owner": owner, "com.regionbox.workspace": workspace.id});
     Ok(json!({
@@ -248,13 +276,15 @@ pub fn compose_document(owner: &str, workspace: &Workspace) -> Result<Value> {
                 "image": VPN_IMAGE, "container_name": format!("{project}-vpn"),
                 "cap_add": ["NET_ADMIN"], "devices": ["/dev/net/tun:/dev/net/tun"],
                 "environment": {
-                    "VPN_SERVICE_PROVIDER": "nordvpn", "VPN_TYPE": "openvpn",
+                    "VPN_SERVICE_PROVIDER": "custom", "VPN_TYPE": "openvpn",
+                    "OPENVPN_CUSTOM_CONFIG": "/gluetun/custom.conf",
                     "OPENVPN_USER_SECRETFILE": "/run/secrets/nord_user",
                     "OPENVPN_PASSWORD_SECRETFILE": "/run/secrets/nord_password",
-                    "SERVER_COUNTRIES": country, "FIREWALL_INPUT_PORTS": "3000",
+                    "FIREWALL_INPUT_PORTS": "3000",
                     "HTTP_CONTROL_SERVER_ADDRESS": "127.0.0.1:8000",
-                    "UPDATER_PERIOD": "24h", "TZ": "Etc/UTC"
+                    "TZ": "Etc/UTC"
                 },
+                "volumes": ["./vpn.ovpn:/gluetun/custom.conf:ro"],
                 "secrets": ["nord_user", "nord_password"],
                 "sysctls": {"net.ipv6.conf.all.disable_ipv6": "1"},
                 "ports": [{"target":3000, "published": workspace.port.to_string(), "host_ip":"127.0.0.1", "protocol":"tcp"}],
@@ -294,7 +324,8 @@ impl Manager {
                 .map_err(|_| "Workspace settings are damaged. Preserve the data folder before repairing workspaces.json.".to_string())?
         } else {
             let mut workspaces = Vec::new();
-            for (index, (country, name)) in COUNTRIES.iter().enumerate() {
+            for (index, country) in ["US", "DE", "GB"].iter().enumerate() {
+                let name = country_name(country)?;
                 workspaces.push(Workspace {
                     id: country.to_lowercase(),
                     name: name.to_string(),
@@ -562,17 +593,15 @@ impl Manager {
             fs::write(directory.join("nord-user"), user).map_err(io_error)?;
             fs::write(directory.join("nord-password"), password).map_err(io_error)?;
             write_json(&path, &document)?;
-            let mut command = docker();
-            command.args(["compose", "--file"]).arg(&path).args(["up", "--detach", "vpn"]);
-            execute(command, 40).await.map_err(|_| "Could not start the credential check. Check Docker Desktop and retry.")?;
-            wait_for_vpn(&container).await
+            let configs = crate::nord::recommended_configs("US").await?;
+            connect_recommended(&path, &container, &configs).await
         }.await;
         let cleanup = if path.exists() {
             let mut command = docker();
             command.args(["compose", "--file"]).arg(&path).args(["down", "--timeout", "5"]);
             execute(command, 30).await.map(|_| ())
         } else { Ok(()) };
-        for file in ["nord-user", "nord-password", "compose.json", "compose.tmp"] {
+        for file in ["nord-user", "nord-password", "compose.json", "compose.tmp", "vpn.ovpn"] {
             let _ = fs::remove_file(directory.join(file));
         }
         let _ = fs::remove_dir(&directory);
@@ -652,12 +681,13 @@ impl Manager {
                     docker_args(&["pull", image], 900).await?;
                 }
             }
-            self.phase(id, "starting", "Connecting NordVPN. Trying another server can take a few minutes.").await;
+            self.phase(id, "starting", "Finding NordVPN’s recommended servers for this country").await;
+            let configs = crate::nord::recommended_configs(&workspace.country).await?;
             // Recreate the pair together: a replacement VPN means a new network namespace.
             // Named profile volumes survive `down` because --volumes is never used.
             self.compose(id, &["down", "--timeout", "10"], 60).await?;
-            self.compose(id, &["up", "--detach", "vpn"], 40).await?;
-            wait_for_vpn(&format!("regionbox-{owner}-{id}-vpn")).await?;
+            self.phase(id, "starting", "Connecting to a recommended NordVPN server").await;
+            connect_recommended(&self.root.join(id).join("compose.json"), &format!("regionbox-{owner}-{id}-vpn"), &configs).await?;
             *self.verified_credentials.lock().await = Some(login);
             self.phase(id, "starting", "NordVPN is connected. Starting Chromium").await;
             self.compose(id, &["up", "--detach", "--wait", "--wait-timeout", "180"], 210).await?;
@@ -919,6 +949,7 @@ mod tests {
         fs::write(root.join("nord-user"), "test-only-user").unwrap();
         fs::write(root.join("nord-password"), "test-only-password").unwrap();
         fs::write(root.join("resolv.conf"), "nameserver 127.0.0.1\n").unwrap();
+        fs::write(root.join("vpn.ovpn"), "client\n").unwrap();
         for (country, _) in COUNTRIES {
             let workspace = Workspace {
                 id: country.to_lowercase(),

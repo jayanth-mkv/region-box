@@ -52,6 +52,11 @@ try {
           return;
         }
         if (command === 'dismiss_setup') { state.setup.dismissed = true; return; }
+        if (command === 'create_workspace') {
+          const workspace = { id: 'new-country', name: args.name, country: args.country, port: 32104, state: 'stopped', detail: '', browserUrl: null, network: null };
+          state.data.workspaces.push(workspace);
+          return structuredClone(workspace);
+        }
         if (command === 'start_workspace') {
           const workspace = state.data.workspaces.find(workspace => workspace.id === args.id);
           workspace.state = 'starting'; workspace.detail = 'Connecting NordVPN and starting Chromium';
@@ -116,7 +121,8 @@ try {
   await page.evaluate(() => window.__setupFixture.resolve());
   await expect(page.getByText('Open your first browser', { exact: true })).toBeVisible();
   await expect(page.getByText(/\.env/)).toHaveCount(0);
-  await page.getByLabel('First workspace').selectOption('de');
+  await expect(page.getByLabel('First workspace').locator('option')).toHaveCount(10);
+  await page.getByLabel('First workspace').selectOption('new:IN');
   await page.getByRole('button', { name: 'Start first browser' }).click();
   await expect(page.getByRole('button', { name: 'Set up later' })).toBeDisabled();
   await page.evaluate(() => window.__setupFixture.resolve());
@@ -125,7 +131,7 @@ try {
   await page.setViewportSize({ width: 760, height: 560 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   await page.getByRole('button', { name: 'Open browser', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'India', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
   console.log('PASS: onboarding UI fixtures cover installation progress, restart pause, automatic next step, download retry, credentials, country selection, completion, and narrow layout.');
   console.log('These fixtures do not execute Windows/Docker installers or establish a VPN connection.');

@@ -1,4 +1,5 @@
 pub mod core;
+pub mod nord;
 pub mod setup;
 use core::{Manager, NetworkCheck, Snapshot, Workspace};
 use setup::{SetupManager, SetupStatus};
