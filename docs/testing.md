@@ -7,6 +7,7 @@
 - Passed: 12 Rust checks, including current NordVPN recommendations and valid connection files for all ten countries, and Compose validation for each country.
 - Passed: onboarding fixtures keep failed credential checks on the entry step, allow retry and checking saved values, and create an Indian workspace from the first-browser country picker.
 - Passed: native desktop checks for credential input validation, saved-but-unverified credentials, setup persistence, and workspace creation.
+- Passed: the rebuilt NSIS installer updated the installed app; the installed release passed the native desktop checks and the real onboarding credential check. The credentials step stayed busy until NordVPN accepted the connection, then displayed verification success and all ten country choices. Screenshot: `test-results/credentials-verified-native.png`.
 - Startup now waits for a healthy VPN before creating Chromium. Each start downloads current configurations for NordVPN's recommended servers; the previous bundled server data included outdated addresses and ports.
 - Canada initially failed the website IP check; the resolver trace plus website fallback passed on retest. A French server rejected a login that worked elsewhere; startup now tries the remaining recommended servers before reporting failure, and France passed on retest.
 
