@@ -7,6 +7,7 @@
 - Passed: an HttpOnly persistent test cookie survived removal and recreation of its browser container. A separate fresh profile could not read it. These tests use disposable profiles and never inspect personal browser data.
 - Passed: a real US VPN browser uses Gluetun's loopback DNS and has IPv6 disabled. Pausing only its VPN container blocked an external IP request; access recovered after resuming the tunnel. The user's two running workspaces were untouched.
 - Passed: browser-frame bounds and no document overflow at 760×560, 1280×820, and 1920×1080; onboarding fixtures and ten Rust unit checks.
+- Passed: the v0.1.1 installer updated the installed app, whose binary matches the release build. Native WebView2 tests confirmed actual Windows full-screen entry/exit, a visible exit button, and the existing setup/workspace checks. Screenshot: `test-results/fullscreen-native.png`.
 - Browser password saving is disabled because the container has no OS password vault. Audio playback is enabled; camera and microphone forwarding remain disabled. Download/file transfer navigation starts in `/config/Downloads`.
 - Running workspaces need one stop/start after installing this release to apply the browser changes. Existing profile volumes are reused.
 
