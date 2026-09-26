@@ -13,7 +13,7 @@ for (const path of files) {
 }
 const emails = new Set(git('log', '--format=%ae%n%ce', 'HEAD').trim().split(/\r?\n/));
 for (const email of emails) {
-  if (!email.endsWith('@users.noreply.github.com')) failures.push('Git history includes a private author/committer email; use a GitHub no-reply address.');
+  if (!email.endsWith('@users.noreply.github.com') && email !== 'noreply@github.com') failures.push('Git history includes a private author/committer email; use a GitHub no-reply address.');
 }
 const example = readFileSync('.env.example', 'utf8');
 if (/^NORDVPN_SERVICE_(?:USER|PASSWORD)[ \t]*=[ \t]*[^ \t\r\n]+/m.test(example)) failures.push('.env.example: credential placeholders must be empty');
