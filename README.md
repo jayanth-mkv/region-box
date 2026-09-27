@@ -25,6 +25,9 @@
 <p align="center">Run several Chromium sessions at once, each with its own NordVPN connection and saved browser profile.</p>
 
 <p align="center">
+  <img src="docs/images/onboarding-complete.png" width="100%" alt="RegionBox with a United States browser open to example.com, country workspaces in the sidebar, and full-screen controls." />
+</p>
+<p align="center">
   <img src="docs/images/regionbox-preview.png" width="100%" alt="RegionBox with a United States browser open to example.com, country workspaces in the sidebar, and full-screen controls." />
 </p>
 
